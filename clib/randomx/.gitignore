@@ -1,0 +1,14 @@
+bin/
+obj/
+*.user
+*.suo
+.vs
+x64/
+Release/
+Debug/
+build/
+cmake-build-debug/
+cmake-build-release/
+.idea/
+.vscode/
+*.a
