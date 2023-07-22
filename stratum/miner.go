@@ -1,7 +1,6 @@
 package stratum
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"strconv"
@@ -9,11 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/XDagger/xdagpool/base58"
 	"github.com/XDagger/xdagpool/util"
 )
 
 type Job struct {
-	height int64
+	jobHash string
 	sync.RWMutex
 	id          string
 	extraNonce  uint32
@@ -30,8 +30,9 @@ type Miner struct {
 	rejects       int64
 	shares        map[int64]int64
 	sync.RWMutex
-	id string
-	ip string
+	id  string
+	ip  string
+	uid string
 
 	maxConcurrency int
 }
@@ -46,25 +47,25 @@ func (job *Job) submit(nonce string) bool {
 	return false
 }
 
-func NewMiner(id string, ip string, maxConcurrency int) *Miner {
+func NewMiner(uid, id string, ip string, maxConcurrency int) *Miner {
 	shares := make(map[int64]int64)
-	return &Miner{id: id, ip: ip, shares: shares, maxConcurrency: maxConcurrency}
+	return &Miner{uid: uid, id: id, ip: ip, shares: shares, maxConcurrency: maxConcurrency}
 }
 
 func (cs *Session) getJob(t *BlockTemplate) *JobReplyData {
-	height := atomic.SwapInt64(&cs.lastBlockHeight, t.height)
+	hash := cs.lastJobHash.Swap(t.jobHash)
 
-	if height == t.height {
+	if hash == t.jobHash {
 		return &JobReplyData{}
 	}
 
 	extraNonce := atomic.AddUint32(&cs.endpoint.extraNonce, 1)
-	blob := t.nextBlob(extraNonce, cs.endpoint.instanceId)
+	blob := t.nextBlob(cs.login, extraNonce, cs.endpoint.instanceId)
 	id := atomic.AddUint64(&cs.endpoint.jobSequence, 1)
 	job := &Job{
 		id:         strconv.FormatUint(id, 10),
 		extraNonce: extraNonce,
-		height:     t.height,
+		jobHash:    t.jobHash,
 	}
 	job.submissions = make(map[string]struct{})
 	cs.pushJob(job)
@@ -137,28 +138,31 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	hashrateExpiration time.Duration) bool {
 	r := s.rpc()
 
-	// 8 bytes (reserved) = 4 bytes (extraNonce) + 4 bytes (instanceId)
-	shareBuff := make([]byte, len(t.buffer))
+	// 32 bytes (reserved) = 24 bytes (wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId)
+	shareBuff := make([]byte, len(t.buffer)*2)
 
 	copy(shareBuff, t.buffer)
 
-	extraBuff := new(bytes.Buffer)
-	_ = binary.Write(extraBuff, binary.BigEndian, job.extraNonce)
-	copy(shareBuff[t.reservedOffset:], extraBuff.Bytes())
+	addr, _, _ := base58.ChkDec(cs.login)
+	copy(shareBuff[len(t.buffer):], addr[:])
 
-	copy(shareBuff[t.reservedOffset+4:t.reservedOffset+8], cs.endpoint.instanceId)
+	enonce := make([]byte, 4)
+	binary.BigEndian.PutUint32(enonce, job.extraNonce)
+	copy(shareBuff[len(t.buffer)+len(addr):], enonce[:])
+
+	copy(shareBuff[len(t.buffer)+len(addr)+4:], cs.endpoint.instanceId[:])
 
 	nonceBuff, _ := hex.DecodeString(nonce)
-	copy(shareBuff[39:], nonceBuff)
+	copy(shareBuff[60:], nonceBuff)
 
 	var hashBytes, convertedBlob []byte
 
 	if s.config.BypassShareValidation {
 		hashBytes, _ = hex.DecodeString(result)
 	} else {
-		convertedBlob = util.ConvertBlob(shareBuff)
+		// convertedBlob = util.ConvertBlob(shareBuff)
 		//hashBytes = hashing.Hash(convertedBlob, false, t.height)
-		hashBytes = util.RxHash(convertedBlob, t.seedHash, t.height, uint(m.maxConcurrency))
+		hashBytes = util.RxHash(shareBuff, t.seedHash, t.height, uint(m.maxConcurrency))
 	}
 
 	if !s.config.BypassShareValidation && hex.EncodeToString(hashBytes) != result {
@@ -178,7 +182,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	block := hashDiff.Cmp(t.difficulty) >= 0
 
 	nonceHex := hex.EncodeToString(nonceBuff)
-	extraHex := hex.EncodeToString(extraBuff.Bytes())
+	extraHex := hex.EncodeToString(enonce)
 	instanceIdHex := hex.EncodeToString(cs.endpoint.instanceId)
 	paramIn := []string{nonceHex, extraHex, instanceIdHex}
 

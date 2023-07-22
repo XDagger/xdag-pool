@@ -65,7 +65,7 @@ type Endpoint struct {
 }
 
 type Session struct {
-	lastBlockHeight int64
+	lastJobHash atomic.Value
 	sync.Mutex
 
 	conn    *net.TCPConn
@@ -76,6 +76,7 @@ type Session struct {
 
 	login string
 	id    string
+	uid   string
 
 	endpoint  *Endpoint
 	validJobs []*Job
@@ -520,11 +521,11 @@ func (s *StratumServer) isActive(cs *Session) bool {
 }
 
 func (s *StratumServer) registerMiner(miner *Miner) {
-	s.miners.Set(miner.id, miner)
+	s.miners.Set(miner.uid, miner)
 }
 
-func (s *StratumServer) removeMiner(id string) {
-	s.miners.Remove(id)
+func (s *StratumServer) removeMiner(uid string) {
+	s.miners.Remove(uid)
 }
 
 func (s *StratumServer) currentBlockTemplate() *BlockTemplate {
