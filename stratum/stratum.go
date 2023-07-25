@@ -211,8 +211,8 @@ func NewEndpoint(cfg *pool.Port) *Endpoint {
 	if err != nil {
 		Error.Fatalf("Can't seed with random bytes: %v", err)
 	}
-	e.targetHex = util.GetTargetHex(e.config.Difficulty)
-	e.difficulty = big.NewInt(e.config.Difficulty)
+	e.targetHex = util.GetTargetHex(e.config.Difficulty) // default 000037EC8EC25E6D
+	e.difficulty = big.NewInt(e.config.Difficulty)       //default 300000
 	return e
 }
 

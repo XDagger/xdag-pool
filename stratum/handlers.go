@@ -18,7 +18,7 @@ func init() {
 }
 
 func (s *StratumServer) handleLoginRPC(cs *Session, params *LoginParams) (*JobReply, *ErrorReply) {
-	address, id := extractWorkerId(params.Login)
+	address, id := extractWorkerId(params.Login, params.Pass)
 	if !s.config.BypassAddressValidation && !util.ValidateAddress(address) {
 		util.Error.Printf("Invalid address %s used for login by %s", address, cs.ip)
 		return nil, &ErrorReply{Code: -1, Message: "Invalid address used for login"}
@@ -146,10 +146,12 @@ func (s *StratumServer) refreshBlockTemplate(bcast bool) {
 	}
 }
 
-func extractWorkerId(loginWorkerPair string) (string, string) {
+func extractWorkerId(loginWorkerPair, pass string) (string, string) {
 	parts := strings.SplitN(loginWorkerPair, ".", 2)
 	if len(parts) > 1 {
 		return parts[0], parts[1]
+	} else if len(pass) > 0 && pass != "x" {
+		return loginWorkerPair, pass
 	}
 	return loginWorkerPair, defaultWorkerId
 }

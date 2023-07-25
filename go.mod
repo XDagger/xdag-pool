@@ -10,6 +10,7 @@ require (
 	github.com/mutalisk999/bitcoin-lib v0.0.0-20201203080325-81caed73682f
 	github.com/onsi/ginkgo v1.16.1 // indirect
 	github.com/onsi/gomega v1.11.0 // indirect
+	github.com/redis/go-redis/v9 v9.0.5
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/term v0.1.0
 	gopkg.in/bsm/ratelimit.v1 v1.0.0-20160220154919-db14e161995a // indirect

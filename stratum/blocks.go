@@ -62,7 +62,7 @@ func (s *StratumServer) fetchBlockTemplate() bool {
 		return false
 		// }
 	} else {
-		util.Info.Printf("New block to mine on %s at height %v, diff: %v, timestamp: %s", r.Name, reply.Height, reply.Difficulty, reply.Timestamp)
+		util.Info.Printf("New block to mine on %s at height %v, diff: %v, timestamp: %v", r.Name, reply.Height, reply.Difficulty, reply.Timestamp)
 	}
 	newTemplate := BlockTemplate{
 		diffInt64:  reply.Difficulty,
