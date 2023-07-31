@@ -153,16 +153,17 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	copy(shareBuff[len(t.buffer)+len(addr)+4:], cs.endpoint.instanceId[:])
 
 	nonceBuff, _ := hex.DecodeString(nonce)
-	copy(shareBuff[60:], nonceBuff)
+	copy(shareBuff[60:], nonceBuff[:4])
 
-	var hashBytes, convertedBlob []byte
+	// var hashBytes, convertedBlob []byte
+	var hashBytes []byte
 
 	if s.config.BypassShareValidation {
 		hashBytes, _ = hex.DecodeString(result)
 	} else {
 		// convertedBlob = util.ConvertBlob(shareBuff)
 		//hashBytes = hashing.Hash(convertedBlob, false, t.height)
-		hashBytes = util.RxHash(shareBuff, t.seedHash, t.height, uint(m.maxConcurrency))
+		hashBytes = util.RxHash(shareBuff)
 	}
 
 	if !s.config.BypassShareValidation && hex.EncodeToString(hashBytes) != result {
@@ -195,10 +196,10 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 			util.Error.Printf("Block rejected at height %d: %v", t.height, err)
 			util.BlockLog.Printf("Block rejected at height %d: %v", t.height, err)
 		} else {
-			if len(convertedBlob) == 0 {
-				convertedBlob = util.ConvertBlob(shareBuff)
-			}
-			blockFastHash := hex.EncodeToString(util.FastHash(convertedBlob))
+			// if len(convertedBlob) == 0 {
+			// 	convertedBlob = util.ConvertBlob(shareBuff)
+			// }
+			blockFastHash := hex.EncodeToString(util.FastHash(shareBuff))
 			now := util.MakeTimestamp()
 			roundShares := atomic.SwapInt64(&s.roundShares, 0)
 			ratio := float64(roundShares) / float64(t.diffInt64)

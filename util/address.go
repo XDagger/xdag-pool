@@ -8,6 +8,6 @@ func ValidateAddress(address string) bool {
 	return err == nil
 }
 
-func ConvertBlob(blob []byte) []byte {
-	return blob
-}
+// func ConvertBlob(blob []byte) []byte {
+// 	return blob
+// }

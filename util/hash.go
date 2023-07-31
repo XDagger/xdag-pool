@@ -1,6 +1,10 @@
 package util
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+
+	"github.com/XDagger/xdagpool/randomx"
+)
 
 func FastHash(blob []byte) []byte {
 	hash := sha256.Sum256(blob)
@@ -8,6 +12,6 @@ func FastHash(blob []byte) []byte {
 	return h[:]
 }
 
-func RxHash(blob []byte, seedHash []byte, height int64, maxConcurrency uint) []byte {
-	return blob
+func RxHash(blob []byte) []byte {
+	return randomx.Rx.CalculateHash(blob)
 }

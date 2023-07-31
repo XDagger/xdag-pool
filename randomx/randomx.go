@@ -112,9 +112,9 @@ func CreateVM(cache Cache, dataset Dataset, flags ...C.randomx_flags) (VM, error
 		SumFlag = SumFlag | flag
 	}
 
-	if dataset == nil {
-		panic("failed creating vm: using empty dataset")
-	}
+	//if dataset == nil {
+	//	panic("failed creating vm: using empty dataset")
+	//}
 
 	vm := C.randomx_create_vm(SumFlag, cache, dataset)
 

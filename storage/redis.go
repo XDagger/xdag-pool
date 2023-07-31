@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/XDagger/xdagpool/pool"
+	"github.com/XDagger/xdagpool/util"
 
 	"github.com/redis/go-redis/v9"
-
-	. "github.com/XDagger/xdagpool/util"
 )
 
 var ctx = context.Background()
@@ -145,7 +144,7 @@ func (r *RedisClient) GetWhitelist() ([]string, error) {
 
 func (r *RedisClient) WriteNodeState(id string, height uint32, diff *big.Int) error {
 	tx := r.client.TxPipeline()
-	now := MakeTimestamp() / 1000
+	now := util.MakeTimestamp() / 1000
 	tx.HSet(ctx, r.formatKey("nodes"), join(id, "name"), id)
 	tx.HSet(ctx, r.formatKey("nodes"), join(id, "height"), strconv.FormatUint(uint64(height), 10))
 	tx.HSet(ctx, r.formatKey("nodes"), join(id, "difficulty"), diff.String())
@@ -170,7 +169,7 @@ func (r *RedisClient) GetNodeStates() ([]map[string]interface{}, error) {
 			m[parts[0]] = node
 		}
 	}
-	v := make([]map[string]interface{}, len(m), len(m))
+	v := make([]map[string]interface{}, len(m))
 	i := 0
 	for _, value := range m {
 		v[i] = value
@@ -196,7 +195,7 @@ func (r *RedisClient) WriteShare(login, id string, params []string, diff int64, 
 
 	tx := r.client.TxPipeline()
 	// defer tx.Close()
-	ms := MakeTimestamp()
+	ms := util.MakeTimestamp()
 	ts := ms / 1000
 
 	r.writeShare(tx, ms, ts, login, id, diff, window)
@@ -234,7 +233,7 @@ func (r *RedisClient) WriteBlock(login, id string, params []string, diff, roundD
 	tx := r.client.TxPipeline()
 	// defer tx.Close()
 
-	ms := MakeTimestamp()
+	ms := util.MakeTimestamp()
 	ts := ms / 1000
 
 	r.writeShare(tx, ms, ts, login, id, diff, window)
@@ -281,25 +280,24 @@ func (r *RedisClient) formatRound(height int64, nonce string) string {
 func join(args ...interface{}) string {
 	s := make([]string, len(args))
 	for i, v := range args {
-		switch v.(type) {
+		switch x := v.(type) {
 		case string:
-			s[i] = v.(string)
+			s[i] = x
 		case int64:
-			s[i] = strconv.FormatInt(v.(int64), 10)
+			s[i] = strconv.FormatInt(x, 10)
 		case uint64:
-			s[i] = strconv.FormatUint(v.(uint64), 10)
+			s[i] = strconv.FormatUint(x, 10)
 		case float64:
-			s[i] = strconv.FormatFloat(v.(float64), 'f', 0, 64)
+			s[i] = strconv.FormatFloat(x, 'f', 0, 64)
 		case bool:
-			if v.(bool) {
+			if x {
 				s[i] = "1"
 			} else {
 				s[i] = "0"
 			}
 		case *big.Int:
-			n := v.(*big.Int)
-			if n != nil {
-				s[i] = n.String()
+			if x != nil {
+				s[i] = x.String()
 			} else {
 				s[i] = "0"
 			}
@@ -362,7 +360,7 @@ func (r *RedisClient) GetPayees() ([]string, error) {
 			break
 		}
 	}
-	for login, _ := range payees {
+	for login := range payees {
 		result = append(result, login)
 	}
 	return result, nil
@@ -382,7 +380,7 @@ func (r *RedisClient) LockPayouts(login string, amount int64) error {
 	key := r.formatKey("payments", "lock")
 	result := r.client.SetNX(ctx, key, join(login, amount), 0).Val()
 	if !result {
-		return fmt.Errorf("Unable to acquire lock '%s'", key)
+		return fmt.Errorf("unable to acquire lock '%s'", key)
 	}
 	return nil
 }
@@ -430,7 +428,7 @@ func (r *RedisClient) UpdateBalance(login string, amount int64) error {
 	tx := r.client.TxPipeline()
 	// defer tx.Close()
 
-	ts := MakeTimestamp() / 1000
+	ts := util.MakeTimestamp() / 1000
 
 	tx.HIncrBy(ctx, r.formatKey("miners", login), "balance", (amount * -1))
 	tx.HIncrBy(ctx, r.formatKey("miners", login), "pending", amount)
@@ -459,7 +457,7 @@ func (r *RedisClient) WritePayment(login, txHash string, amount int64) error {
 	tx := r.client.TxPipeline()
 	// defer tx.Close()
 
-	ts := MakeTimestamp() / 1000
+	ts := util.MakeTimestamp() / 1000
 
 	tx.HIncrBy(ctx, r.formatKey("miners", login), "pending", (amount * -1))
 	tx.HIncrBy(ctx, r.formatKey("miners", login), "paid", amount)
@@ -501,7 +499,7 @@ func (r *RedisClient) WriteMaturedBlock(block *BlockData, roundRewards map[strin
 		// }
 		// defer tx.Close()
 
-		ts := MakeTimestamp() / 1000
+		ts := util.MakeTimestamp() / 1000
 		value := join(block.Hash, ts, block.Reward)
 
 		// _, err = tx.Exec(func() error {
@@ -644,7 +642,7 @@ func convertStringMap(m map[string]string) map[string]interface{} {
 
 // WARNING: Must run it periodically to flush out of window hashrate entries
 func (r *RedisClient) FlushStaleStats(window, largeWindow time.Duration) (int64, error) {
-	now := MakeTimestamp() / 1000
+	now := util.MakeTimestamp() / 1000
 	max := fmt.Sprint("(", now-int64(window/time.Second))
 	total, err := r.client.ZRemRangeByScore(ctx, r.formatKey("hashrate"), "-inf", max).Result()
 	if err != nil {
@@ -700,7 +698,7 @@ func (r *RedisClient) CollectStats(smallWindow time.Duration, maxBlocks, maxPaym
 	tx := r.client.TxPipeline()
 	// defer tx.Close()
 
-	now := MakeTimestamp() / 1000
+	now := util.MakeTimestamp() / 1000
 
 	tx.ZRemRangeByScore(ctx, r.formatKey("hashrate"), "-inf", fmt.Sprint("(", now-window))
 	tx.ZRangeWithScores(ctx, r.formatKey("hashrate"), 0, -1)
@@ -753,7 +751,7 @@ func (r *RedisClient) CollectWorkersStats(sWindow, lWindow time.Duration, login 
 	tx := r.client.TxPipeline()
 	// defer tx.Close()
 
-	now := MakeTimestamp() / 1000
+	now := util.MakeTimestamp() / 1000
 
 	tx.ZRemRangeByScore(ctx, r.formatKey("hashrate", login), "-inf", fmt.Sprint("(", now-largeWindow))
 	tx.ZRangeWithScores(ctx, r.formatKey("hashrate", login), 0, -1)
@@ -918,7 +916,7 @@ func convertBlockResults(rows ...*redis.ZSliceCmd) []*BlockData {
 // Build per login workers's total shares map {'rig-1': 12345, 'rig-2': 6789, ...}
 // TS => diff, id, ms
 func convertWorkersStats(window int64, raw *redis.ZSliceCmd) map[string]Worker {
-	now := MakeTimestamp() / 1000
+	now := util.MakeTimestamp() / 1000
 	workers := make(map[string]Worker)
 
 	for _, v := range raw.Val() {
@@ -948,7 +946,7 @@ func convertWorkersStats(window int64, raw *redis.ZSliceCmd) map[string]Worker {
 }
 
 func convertMinersStats(window int64, raw *redis.ZSliceCmd) (int64, map[string]Miner) {
-	now := MakeTimestamp() / 1000
+	now := util.MakeTimestamp() / 1000
 	miners := make(map[string]Miner)
 	totalHashrate := int64(0)
 

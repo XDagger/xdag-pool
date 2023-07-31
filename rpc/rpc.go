@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/XDagger/xdagpool/pool"
+	"github.com/XDagger/xdagpool/randomx"
 )
 
 type RPCClient struct {
@@ -114,6 +115,12 @@ func (r *RPCClient) GetBlockTemplate(reserveSize int, address string) (*GetBlock
 	if rpcResp.Result != nil {
 		err = json.Unmarshal(*rpcResp.Result, &reply)
 	}
+
+	if reply.SeedHash != randomx.Rx.CurrentSeed {
+		seed, _ := hex.DecodeString(reply.SeedHash)
+		randomx.Rx.NewSeed(seed)
+	}
+
 	return reply, err
 }
 
