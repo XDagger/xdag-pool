@@ -28,6 +28,11 @@ func init() {
 func (h *RxHash) NewSeed(seed []byte) {
 	h.Lock()
 	defer h.Unlock()
+
+	if h.CurrentSeed == hex.EncodeToString(seed) {
+		return
+	}
+
 	h.LastSeed = h.CurrentSeed
 	h.CurrentSeed = hex.EncodeToString(seed)
 	flags := GetFlags()
@@ -64,11 +69,11 @@ func (h *RxHash) NewSeedSlow(seed []byte) {
 	h.Vm = vm
 }
 
-// func (h *RxHash) IsCurrentSeed(seed []byte) bool {
-// 	h.RLock()
-// 	defer h.RUnlock()
-// 	return h.CurrentSeed == hex.EncodeToString(seed)
-// }
+func (h *RxHash) IsCurrentSeed(seed string) bool {
+	h.RLock()
+	defer h.RUnlock()
+	return h.CurrentSeed == seed
+}
 
 func (h *RxHash) CalculateHash(input []byte) []byte {
 	h.Lock()

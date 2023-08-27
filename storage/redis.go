@@ -178,14 +178,14 @@ func (r *RedisClient) GetNodeStates() ([]map[string]interface{}, error) {
 	return v, nil
 }
 
-func (r *RedisClient) checkPoWExist(height uint64, params []string) (bool, error) {
-	r.client.ZRemRangeByScore(ctx, r.formatKey("pow"), "-inf", fmt.Sprint("(", height-3))
-	val, err := r.client.ZAdd(ctx, r.formatKey("pow"), redis.Z{Score: float64(height), Member: strings.Join(params, ":")}).Result()
+func (r *RedisClient) checkPoWExist(timestamp uint64, params []string) (bool, error) {
+	r.client.ZRemRangeByScore(ctx, r.formatKey("pow"), "-inf", fmt.Sprint("(", timestamp-3*64))
+	val, err := r.client.ZAdd(ctx, r.formatKey("pow"), redis.Z{Score: float64(timestamp), Member: strings.Join(params, ":")}).Result()
 	return val == 0, err
 }
 
-func (r *RedisClient) WriteShare(login, id string, params []string, diff int64, height uint64, window time.Duration) (bool, error) {
-	exist, err := r.checkPoWExist(height, params)
+func (r *RedisClient) WriteShare(login, id string, params []string, diff int64, timestamp uint64, window time.Duration) (bool, error) {
+	exist, err := r.checkPoWExist(timestamp, params)
 	if err != nil {
 		return false, err
 	}
@@ -222,8 +222,8 @@ func (r *RedisClient) WriteRejectShare(ms, ts int64, login, id string, diff int6
 }
 
 func (r *RedisClient) WriteBlock(login, id string, params []string, diff, roundDiff int64, height uint64,
-	coinBaseValue int64, blkTotalFee int64, window time.Duration) (bool, error) {
-	exist, err := r.checkPoWExist(height, params)
+	timestamp uint64, window time.Duration) (bool, error) {
+	exist, err := r.checkPoWExist(timestamp, params)
 	if err != nil {
 		return false, err
 	}
@@ -255,7 +255,7 @@ func (r *RedisClient) WriteBlock(login, id string, params []string, diff, roundD
 			totalShares += n
 		}
 		hashHex := strings.Join(params, ":")
-		s := join(hashHex, ts, roundDiff, totalShares, coinBaseValue, blkTotalFee)
+		s := join(hashHex, ts, roundDiff, totalShares)
 		cmd := r.client.ZAdd(ctx, r.formatKey("blocks", "candidates"), redis.Z{Score: float64(height), Member: s})
 		return false, cmd.Err()
 	}

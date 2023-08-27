@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -40,7 +39,7 @@ type GetBlockTemplateReply struct {
 	Blob       string `json:"blocktemplate_blob"`
 	// ReservedOffset int    `json:"reserved_offset"`
 	// PrevHash string `json:"prev_hash"`
-	Timestamp      int64  `json:"timestamp"`
+	Timestamp      uint64 `json:"timestamp"`
 	ExpectedReward int64  `json:"expected_reward"`
 	SeedHash       string `json:"seed_hash"`
 	// NextSeedHash   string `json:"next_seed_hash"`
@@ -115,8 +114,7 @@ func (r *RPCClient) GetBlockTemplate(reserveSize int, address string) (*GetBlock
 	if rpcResp.Result != nil {
 		err = json.Unmarshal(*rpcResp.Result, &reply)
 	}
-
-	if reply.SeedHash != randomx.Rx.CurrentSeed {
+	if !randomx.Rx.IsCurrentSeed(reply.SeedHash) {
 		seed, _ := hex.DecodeString(reply.SeedHash)
 		randomx.Rx.NewSeed(seed)
 	}
@@ -124,13 +122,13 @@ func (r *RPCClient) GetBlockTemplate(reserveSize int, address string) (*GetBlock
 	return reply, err
 }
 
-// jobHash= 24 bytes blob + 8 bytes timestamp
-func (g *GetBlockTemplateReply) GetJobHash() string {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(g.Timestamp))
-	s := hex.EncodeToString(b)
-	return g.Blob[:48] + s
-}
+// // jobHash= 24 bytes blob + 8 bytes timestamp
+// func (g *GetBlockTemplateReply) GetJobHash() string {
+// 	b := make([]byte, 8)
+// 	binary.BigEndian.PutUint64(b, uint64(g.Timestamp))
+// 	s := hex.EncodeToString(b)
+// 	return g.Blob[:48] + s
+// }
 
 func (r *RPCClient) GetInfo() (*GetInfoReply, error) {
 	params := make(map[string]interface{})
