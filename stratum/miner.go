@@ -59,7 +59,7 @@ func (cs *Session) getJob(t *BlockTemplate) *JobReplyData {
 		return &JobReplyData{}
 	}
 
-	extraNonce := atomic.AddUint32(&cs.endpoint.extraNonce, 1)
+	extraNonce := atomic.AddUint32(&cs.endpoint.extraNonce, 1) // increase extraNonce
 	blob := t.nextBlob(cs.login, extraNonce, cs.endpoint.instanceId)
 	id := atomic.AddUint64(&cs.endpoint.jobSequence, 1)
 	job := &Job{
@@ -144,13 +144,13 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	copy(shareBuff, t.buffer)
 
 	addr, _, _ := base58.ChkDec(cs.login)
-	copy(shareBuff[len(t.buffer):], addr[:])
+	copy(shareBuff[len(t.buffer):], addr[:len(addr)-4]) // without checksum bytes
 
 	enonce := make([]byte, 4)
 	binary.BigEndian.PutUint32(enonce, job.extraNonce)
-	copy(shareBuff[len(t.buffer)+len(addr):], enonce[:])
+	copy(shareBuff[len(t.buffer)+len(addr)-4:], enonce[:])
 
-	copy(shareBuff[len(t.buffer)+len(addr)+4:], cs.endpoint.instanceId[:])
+	copy(shareBuff[len(t.buffer)+len(addr):], cs.endpoint.instanceId[:])
 
 	nonceBuff, _ := hex.DecodeString(nonce) // 32bits share nonce sent by miner
 	copy(shareBuff[60:], nonceBuff[:4])

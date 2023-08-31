@@ -67,3 +67,12 @@ func ChkDec(input string) (result []byte, version byte, err error) {
 	result = append(result, payload...)
 	return
 }
+
+// ChkEnc encode 20 bytes into base58 address with check sum
+func ChkEnc(input []byte) string {
+	b := make([]byte, 0, len(input)+4)
+	b = append(b, input...)
+	cksum := checksum(b)
+	b = append(b, cksum[:]...)
+	return Encode(b)
+}

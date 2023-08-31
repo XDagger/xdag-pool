@@ -13,13 +13,14 @@ type Rank struct {
 	Hashrate float64
 }
 type SortedHashrate struct {
-	lastLock sync.RWMutex
-	curLock  sync.RWMutex
-	set      [2]*sortedset.SortedSet
-	Last     *sortedset.SortedSet
-	Current  *sortedset.SortedSet
-	step     uint64
-	interval int
+	lastLock      sync.RWMutex
+	curLock       sync.RWMutex
+	set           [2]*sortedset.SortedSet
+	Last          *sortedset.SortedSet
+	Current       *sortedset.SortedSet
+	step          uint64
+	interval      int
+	totalHashrate float64
 }
 
 var HashrateRank *SortedHashrate
@@ -55,6 +56,7 @@ func (s *SortedHashrate) Next() {
 	n = s.step % 2
 	s.set[n] = sortedset.New()
 	s.Current = s.set[n]
+	s.totalHashrate = float64(s.Last.PopMax().Score()) / float64(s.interval)
 }
 
 // accumulate share diff for miners

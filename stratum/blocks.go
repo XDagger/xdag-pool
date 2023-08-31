@@ -31,13 +31,13 @@ func (b *BlockTemplate) nextBlob(address string, extraNonce uint32, instanceId [
 	copy(blobBuff, b.buffer)
 
 	addr, _, _ := base58.ChkDec(address)
-	copy(blobBuff[len(b.buffer):], addr[:])
+	copy(blobBuff[len(b.buffer):], addr[:len(addr)-4]) // without checksum bytes
 
 	enonce := make([]byte, 4)
 	binary.BigEndian.PutUint32(enonce, extraNonce)
-	copy(blobBuff[len(b.buffer)+len(addr):], enonce[:])
+	copy(blobBuff[len(b.buffer)+len(addr)-4:], enonce[:])
 
-	copy(blobBuff[len(b.buffer)+len(addr)+4:], instanceId[:])
+	copy(blobBuff[len(b.buffer)+len(addr):], instanceId[:])
 
 	return hex.EncodeToString(blobBuff)
 }
