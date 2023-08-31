@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/XDagger/xdagpool/kvstore"
 	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/util"
 
@@ -32,7 +33,7 @@ const donationAccount = ""
 
 type BlockUnlocker struct {
 	config   *pool.UnlockerConfig
-	backend  *storage.RedisClient
+	backend  *kvstore.KvClient
 	rpc      *rpc.RPCClient
 	halt     bool
 	lastFail error
@@ -41,7 +42,7 @@ type BlockUnlocker struct {
 	counter uint64
 }
 
-func NewBlockUnlocker(cfg *pool.UnlockerConfig, backend *storage.RedisClient) *BlockUnlocker {
+func NewBlockUnlocker(cfg *pool.UnlockerConfig, backend *kvstore.KvClient) *BlockUnlocker {
 	if len(cfg.PoolFeeAddress) != 0 && !util.ValidateAddress(cfg.PoolFeeAddress) {
 		Error.Fatalln("Invalid poolFeeAddress", cfg.PoolFeeAddress)
 	}
