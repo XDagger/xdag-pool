@@ -19,9 +19,9 @@ import (
 	"github.com/gorilla/mux"
 	"golang.org/x/term"
 
+	"github.com/XDagger/xdagpool/kvstore"
 	"github.com/XDagger/xdagpool/payouts"
 	"github.com/XDagger/xdagpool/pool"
-	"github.com/XDagger/xdagpool/storage"
 	"github.com/XDagger/xdagpool/stratum"
 	"github.com/XDagger/xdagpool/util"
 )
@@ -35,7 +35,7 @@ var (
 )
 
 var cfg pool.Config
-var backend *storage.RedisClient = nil
+var backend *kvstore.KvClient = nil
 
 func startStratum() {
 	if cfg.Threads > 0 {
@@ -210,9 +210,9 @@ func main() {
 	}
 
 	if cfg.Redis.Enabled {
-		backend = storage.NewRedisClient(&cfg.Redis, cfg.Coin)
+		backend = kvstore.NewKvClient(&cfg.Redis, cfg.Coin)
 	} else if cfg.RedisFailover.Enabled {
-		backend = storage.NewRedisFailoverClient(&cfg.RedisFailover, cfg.Coin)
+		backend = kvstore.NewKvFailoverClient(&cfg.RedisFailover, cfg.Coin)
 	}
 
 	if backend == nil {

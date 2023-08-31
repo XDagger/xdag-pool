@@ -1,7 +1,6 @@
 package stratum
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"strconv"
@@ -9,11 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/XDagger/xdagpool/base58"
 	"github.com/XDagger/xdagpool/util"
 )
 
 type Job struct {
-	height int64
+	jobHash string
 	sync.RWMutex
 	id          string
 	extraNonce  uint32
@@ -30,8 +30,9 @@ type Miner struct {
 	rejects       int64
 	shares        map[int64]int64
 	sync.RWMutex
-	id string
-	ip string
+	id  string
+	ip  string
+	uid string
 
 	maxConcurrency int
 }
@@ -46,31 +47,31 @@ func (job *Job) submit(nonce string) bool {
 	return false
 }
 
-func NewMiner(id string, ip string, maxConcurrency int) *Miner {
+func NewMiner(uid, id string, ip string, maxConcurrency int) *Miner {
 	shares := make(map[int64]int64)
-	return &Miner{id: id, ip: ip, shares: shares, maxConcurrency: maxConcurrency}
+	return &Miner{uid: uid, id: id, ip: ip, shares: shares, maxConcurrency: maxConcurrency}
 }
 
 func (cs *Session) getJob(t *BlockTemplate) *JobReplyData {
-	height := atomic.SwapInt64(&cs.lastBlockHeight, t.height)
+	hash := cs.lastJobHash.Swap(t.jobHash)
 
-	if height == t.height {
+	if hash == t.jobHash {
 		return &JobReplyData{}
 	}
 
-	extraNonce := atomic.AddUint32(&cs.endpoint.extraNonce, 1)
-	blob := t.nextBlob(extraNonce, cs.endpoint.instanceId)
+	extraNonce := atomic.AddUint32(&cs.endpoint.extraNonce, 1) // increase extraNonce
+	blob := t.nextBlob(cs.login, extraNonce, cs.endpoint.instanceId)
 	id := atomic.AddUint64(&cs.endpoint.jobSequence, 1)
 	job := &Job{
 		id:         strconv.FormatUint(id, 10),
 		extraNonce: extraNonce,
-		height:     t.height,
+		jobHash:    t.jobHash,
 	}
 	job.submissions = make(map[string]struct{})
 	cs.pushJob(job)
 	reply := &JobReplyData{Algo: "rx/xdag", JobId: job.id, Blob: blob, Target: cs.endpoint.targetHex,
 		Height:   t.height,
-		SeedHash: hex.EncodeToString(t.seedHash), NextSeedHash: hex.EncodeToString(t.nextSeedHash)}
+		SeedHash: hex.EncodeToString(t.seedHash)}
 	return reply
 }
 
@@ -137,28 +138,31 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	hashrateExpiration time.Duration) bool {
 	r := s.rpc()
 
-	// 8 bytes (reserved) = 4 bytes (extraNonce) + 4 bytes (instanceId)
-	shareBuff := make([]byte, len(t.buffer))
+	// 32 bytes (reserved) = 24 bytes (wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId)
+	shareBuff := make([]byte, len(t.buffer)*2)
 
 	copy(shareBuff, t.buffer)
 
-	extraBuff := new(bytes.Buffer)
-	_ = binary.Write(extraBuff, binary.BigEndian, job.extraNonce)
-	copy(shareBuff[t.reservedOffset:], extraBuff.Bytes())
+	addr, _, _ := base58.ChkDec(cs.login)
+	copy(shareBuff[len(t.buffer):], addr[:len(addr)-4]) // without checksum bytes
 
-	copy(shareBuff[t.reservedOffset+4:t.reservedOffset+8], cs.endpoint.instanceId)
+	enonce := make([]byte, 4)
+	binary.BigEndian.PutUint32(enonce, job.extraNonce)
+	copy(shareBuff[len(t.buffer)+len(addr)-4:], enonce[:])
 
-	nonceBuff, _ := hex.DecodeString(nonce)
-	copy(shareBuff[39:], nonceBuff)
+	copy(shareBuff[len(t.buffer)+len(addr):], cs.endpoint.instanceId[:])
 
-	var hashBytes, convertedBlob []byte
+	nonceBuff, _ := hex.DecodeString(nonce) // 32bits share nonce sent by miner
+	copy(shareBuff[60:], nonceBuff[:4])
+
+	var hashBytes []byte
 
 	if s.config.BypassShareValidation {
 		hashBytes, _ = hex.DecodeString(result)
 	} else {
-		convertedBlob = util.ConvertBlob(shareBuff)
+		// convertedBlob = util.ConvertBlob(shareBuff)
 		//hashBytes = hashing.Hash(convertedBlob, false, t.height)
-		hashBytes = util.RxHash(convertedBlob, t.seedHash, t.height, uint(m.maxConcurrency))
+		hashBytes = util.RxHash(shareBuff)
 	}
 
 	if !s.config.BypassShareValidation && hex.EncodeToString(hashBytes) != result {
@@ -175,26 +179,24 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 		atomic.AddInt64(&m.invalidShares, 1)
 		return false
 	}
-	block := hashDiff.Cmp(t.difficulty) >= 0
+
+	block := hashDiff.Cmp(cs.endpoint.difficulty) >= 0
 
 	nonceHex := hex.EncodeToString(nonceBuff)
-	extraHex := hex.EncodeToString(extraBuff.Bytes())
+	extraHex := hex.EncodeToString(enonce)
 	instanceIdHex := hex.EncodeToString(cs.endpoint.instanceId)
 	paramIn := []string{nonceHex, extraHex, instanceIdHex}
 
 	if block {
 		// block
-		_, err := r.SubmitBlock(hex.EncodeToString(shareBuff))
+		_, err := r.SubmitBlock(hex.EncodeToString(shareBuff)) //TODO: send pool address + share
 		if err != nil {
 			atomic.AddInt64(&m.rejects, 1)
 			atomic.AddInt64(&r.Rejects, 1)
 			util.Error.Printf("Block rejected at height %d: %v", t.height, err)
 			util.BlockLog.Printf("Block rejected at height %d: %v", t.height, err)
 		} else {
-			if len(convertedBlob) == 0 {
-				convertedBlob = util.ConvertBlob(shareBuff)
-			}
-			blockFastHash := hex.EncodeToString(util.FastHash(convertedBlob))
+			blockFastHash := hex.EncodeToString(util.FastHash(shareBuff))
 			now := util.MakeTimestamp()
 			roundShares := atomic.SwapInt64(&s.roundShares, 0)
 			ratio := float64(roundShares) / float64(t.diffInt64)
@@ -206,7 +208,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 			atomic.StoreInt64(&r.LastSubmissionAt, now)
 
 			exist, err := s.backend.WriteBlock(cs.login, cs.id, paramIn, cs.endpoint.difficulty.Int64(), t.diffInt64, uint64(t.height),
-				t.blockReward, t.txTotalFee, hashrateExpiration)
+				t.timestamp, hashrateExpiration)
 			if exist {
 				ms := util.MakeTimestamp()
 				ts := ms / 1000
@@ -231,7 +233,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 			// Immediately refresh current BT and send new jobs
 			s.refreshBlockTemplate(true)
 		}
-	} else if hashDiff.Cmp(cs.endpoint.difficulty) < 0 {
+	} else {
 		// invalid share
 		ms := util.MakeTimestamp()
 		ts := ms / 1000
@@ -244,21 +246,6 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 		util.ShareLog.Printf("Rejected low difficulty share of %v from %v.%v@%v", hashDiff, cs.login, cs.id, cs.ip)
 		atomic.AddInt64(&m.invalidShares, 1)
 		return false
-	} else {
-		// share
-		exist, err := s.backend.WriteShare(cs.login, cs.id, paramIn, cs.endpoint.difficulty.Int64(), uint64(t.height), s.hashrateExpiration)
-		if exist {
-			ms := util.MakeTimestamp()
-			ts := ms / 1000
-			err := s.backend.WriteInvalidShare(ms, ts, cs.login, cs.id, cs.endpoint.difficulty.Int64())
-			if err != nil {
-				util.Error.Println("Failed to insert invalid share data into backend:", err)
-			}
-			return false
-		}
-		if err != nil {
-			util.Error.Println("Failed to insert share data into backend:", err)
-		}
 	}
 
 	atomic.AddInt64(&s.roundShares, cs.endpoint.config.Difficulty)

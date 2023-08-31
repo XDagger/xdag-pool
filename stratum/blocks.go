@@ -1,44 +1,45 @@
 package stratum
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"io"
 	"math/big"
 
-	"github.com/XDagger/xdagpool/blocktemplate"
+	"github.com/XDagger/xdagpool/base58"
 	"github.com/XDagger/xdagpool/util"
 )
 
 type BlockTemplate struct {
-	diffInt64      int64
-	height         int64
-	difficulty     *big.Int
-	reservedOffset int
-	prevHash       string
-	buffer         []byte
-	seedHash       []byte
+	diffInt64  int64
+	height     int64
+	timestamp  uint64
+	difficulty *big.Int
+	// reservedOffset int
+	jobHash  string
+	buffer   []byte
+	seedHash []byte
 
-	blockReward  int64
-	txTotalFee   int64
-	nextSeedHash []byte
+	// blockReward  int64
+	// txTotalFee   int64
+	// nextSeedHash []byte
 }
 
-func (b *BlockTemplate) nextBlob(extraNonce uint32, instanceId []byte) string {
-	// 8 bytes (reserved) = 4 bytes (extraNonce) + 4 bytes (instanceId)
-	blobBuff := make([]byte, len(b.buffer))
+func (b *BlockTemplate) nextBlob(address string, extraNonce uint32, instanceId []byte) string {
+	// 32 bytes (reserved) = 24 bytes (wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId)
+	blobBuff := make([]byte, len(b.buffer)*2)
 
 	copy(blobBuff, b.buffer)
 
-	extraBuff := new(bytes.Buffer)
-	_ = binary.Write(extraBuff, binary.BigEndian, extraNonce)
-	copy(blobBuff[b.reservedOffset:], extraBuff.Bytes())
+	addr, _, _ := base58.ChkDec(address)
+	copy(blobBuff[len(b.buffer):], addr[:len(addr)-4]) // without checksum bytes
 
-	copy(blobBuff[b.reservedOffset+4:b.reservedOffset+8], instanceId)
+	enonce := make([]byte, 4)
+	binary.BigEndian.PutUint32(enonce, extraNonce)
+	copy(blobBuff[len(b.buffer)+len(addr)-4:], enonce[:])
 
-	blob := util.ConvertBlob(blobBuff)
-	return hex.EncodeToString(blob)
+	copy(blobBuff[len(b.buffer)+len(addr):], instanceId[:])
+
+	return hex.EncodeToString(blobBuff)
 }
 
 func (s *StratumServer) fetchBlockTemplate() bool {
@@ -50,49 +51,50 @@ func (s *StratumServer) fetchBlockTemplate() bool {
 	}
 	t := s.currentBlockTemplate()
 
-	if t != nil && t.prevHash == reply.PrevHash {
-		// Fallback to height comparison
-		if len(reply.PrevHash) == 0 && reply.Height > t.height {
-			util.Info.Printf("New block to mine on %s at height %v, diff: %v", r.Name, reply.Height, reply.Difficulty)
-		} else {
-			return false
-		}
+	if t != nil && t.jobHash == reply.Blob {
+		// // Fallback to height comparison
+		// if len(reply.PrevHash) == 0 && reply.Height > t.height {
+		// 	util.Info.Printf("New block to mine on %s at height %v, timestamp: %v", r.Name, reply.Height, reply.Timestamp)
+		// } else {
+		return false
+		// }
 	} else {
-		util.Info.Printf("New block to mine on %s at height %v, diff: %v, prev_hash: %s", r.Name, reply.Height, reply.Difficulty, reply.PrevHash)
+		util.Info.Printf("New block to mine on %s at height %v, diff: %v, timestamp: %v", r.Name, reply.Height, reply.Difficulty, reply.Timestamp)
 	}
 	newTemplate := BlockTemplate{
-		diffInt64:      reply.Difficulty,
-		difficulty:     big.NewInt(reply.Difficulty),
-		height:         reply.Height,
-		prevHash:       reply.PrevHash,
-		reservedOffset: reply.ReservedOffset,
+		diffInt64:  reply.Difficulty,
+		difficulty: big.NewInt(reply.Difficulty),
+		height:     reply.Height,
+		jobHash:    reply.Blob,
+		timestamp:  reply.Timestamp,
+		// reservedOffset: reply.ReservedOffset,
 	}
 	newTemplate.seedHash, _ = hex.DecodeString(reply.SeedHash)
 	newTemplate.buffer, _ = hex.DecodeString(reply.Blob)
-	newTemplate.nextSeedHash, _ = hex.DecodeString(reply.NextSeedHash)
+	// newTemplate.nextSeedHash, _ = hex.DecodeString(reply.NextSeedHash)
 
-	// set blockReward and txTotalFee
-	var blockTemplateBlob blocktemplate.BlockTemplateBlob
-	bytesBuf := bytes.NewBuffer(newTemplate.buffer)
-	bufReader := io.Reader(bytesBuf)
-	err = blockTemplateBlob.UnPack(bufReader)
-	if err != nil {
-		util.Error.Printf("unpack block template blob fail, blob hex string: %s", reply.Blob)
-		return false
-	}
+	// // set blockReward and txTotalFee
+	// var blockTemplateBlob blocktemplate.BlockTemplateBlob
+	// bytesBuf := bytes.NewBuffer(newTemplate.buffer)
+	// bufReader := io.Reader(bytesBuf)
+	// err = blockTemplateBlob.UnPack(bufReader)
+	// if err != nil {
+	// 	util.Error.Printf("unpack block template blob fail, blob hex string: %s", reply.Blob)
+	// 	return false
+	// }
 
-	if len(blockTemplateBlob.Block.MinerTx.Vout) < 1 {
-		util.Error.Printf("invalid block template blob (Vout count < 1), blob hex string: %s", reply.Blob)
-		return false
-	}
-	newTemplate.blockReward = int64(blockTemplateBlob.Block.MinerTx.Vout[0].Amount)
+	// if len(blockTemplateBlob.Block.MinerTx.Vout) < 1 {
+	// 	util.Error.Printf("invalid block template blob (Vout count < 1), blob hex string: %s", reply.Blob)
+	// 	return false
+	// }
+	// newTemplate.blockReward = int64(blockTemplateBlob.Block.MinerTx.Vout[0].Amount)
 
-	if reply.ExpectedReward < newTemplate.blockReward {
-		util.Error.Printf("invalid block template blob (expectedReward: %d, blockReward: %d), blob hex string: %s",
-			reply.ExpectedReward, newTemplate.blockReward, reply.Blob)
-		return false
-	}
-	newTemplate.txTotalFee = reply.ExpectedReward - newTemplate.blockReward
+	// if reply.ExpectedReward < newTemplate.blockReward {
+	// 	util.Error.Printf("invalid block template blob (expectedReward: %d, blockReward: %d), blob hex string: %s",
+	// 		reply.ExpectedReward, newTemplate.blockReward, reply.Blob)
+	// 	return false
+	// }
+	// newTemplate.txTotalFee = reply.ExpectedReward - newTemplate.blockReward
 
 	s.blockTemplate.Store(&newTemplate)
 	return true

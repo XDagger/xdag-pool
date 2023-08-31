@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/XDagger/xdagpool/storage"
+	"github.com/XDagger/xdagpool/kvstore"
 
 	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/rpc"
@@ -41,7 +41,7 @@ type StratumServer struct {
 	sessionsMu sync.RWMutex
 	sessions   map[*Session]struct{}
 
-	backend            *storage.RedisClient
+	backend            *kvstore.KvClient
 	hashrateExpiration time.Duration
 
 	upstreamsStates []bool
@@ -65,7 +65,7 @@ type Endpoint struct {
 }
 
 type Session struct {
-	lastBlockHeight int64
+	lastJobHash atomic.Value
 	sync.Mutex
 
 	conn    *net.TCPConn
@@ -74,8 +74,10 @@ type Session struct {
 	enc *json.Encoder
 	ip  string
 
-	login string
-	id    string
+	login   string
+	address []byte
+	id      string
+	uid     string
 
 	endpoint  *Endpoint
 	validJobs []*Job
@@ -85,7 +87,7 @@ const (
 	MaxReqSize = 10 * 1024
 )
 
-func NewStratum(cfg *pool.Config, backend *storage.RedisClient) *StratumServer {
+func NewStratum(cfg *pool.Config, backend *kvstore.KvClient) *StratumServer {
 	stratum := &StratumServer{config: cfg, backend: backend, blockStats: make(map[int64]blockEntry),
 		maxConcurrency: cfg.Threads}
 
@@ -206,12 +208,12 @@ func NewStratum(cfg *pool.Config, backend *storage.RedisClient) *StratumServer {
 func NewEndpoint(cfg *pool.Port) *Endpoint {
 	e := &Endpoint{config: cfg}
 	e.instanceId = make([]byte, 4)
-	_, err := rand.Read(e.instanceId)
+	_, err := rand.Read(e.instanceId) // random instance id
 	if err != nil {
 		Error.Fatalf("Can't seed with random bytes: %v", err)
 	}
-	e.targetHex = util.GetTargetHex(e.config.Difficulty)
-	e.difficulty = big.NewInt(e.config.Difficulty)
+	e.targetHex = util.GetTargetHex(e.config.Difficulty) // default 000037EC8EC25E6D
+	e.difficulty = big.NewInt(e.config.Difficulty)       //default 300000
 	return e
 }
 
@@ -520,11 +522,11 @@ func (s *StratumServer) isActive(cs *Session) bool {
 }
 
 func (s *StratumServer) registerMiner(miner *Miner) {
-	s.miners.Set(miner.id, miner)
+	s.miners.Set(miner.uid, miner)
 }
 
-func (s *StratumServer) removeMiner(id string) {
-	s.miners.Remove(id)
+func (s *StratumServer) removeMiner(uid string) {
+	s.miners.Remove(uid)
 }
 
 func (s *StratumServer) currentBlockTemplate() *BlockTemplate {

@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/XDagger/xdagpool/pool"
+	"github.com/XDagger/xdagpool/randomx"
 )
 
 type RPCClient struct {
@@ -32,15 +34,15 @@ type RPCClient struct {
 }
 
 type GetBlockTemplateReply struct {
-	Difficulty     int64  `json:"difficulty"`
-	Height         int64  `json:"height"`
-	Blob           string `json:"blocktemplate_blob"`
-	ReservedOffset int    `json:"reserved_offset"`
-	PrevHash       string `json:"prev_hash"`
-
+	Difficulty int64  `json:"difficulty"`
+	Height     int64  `json:"height"`
+	Blob       string `json:"blocktemplate_blob"`
+	// ReservedOffset int    `json:"reserved_offset"`
+	// PrevHash string `json:"prev_hash"`
+	Timestamp      uint64 `json:"timestamp"`
 	ExpectedReward int64  `json:"expected_reward"`
 	SeedHash       string `json:"seed_hash"`
-	NextSeedHash   string `json:"next_seed_hash"`
+	// NextSeedHash   string `json:"next_seed_hash"`
 }
 
 type GetInfoReply struct {
@@ -112,8 +114,21 @@ func (r *RPCClient) GetBlockTemplate(reserveSize int, address string) (*GetBlock
 	if rpcResp.Result != nil {
 		err = json.Unmarshal(*rpcResp.Result, &reply)
 	}
+	if !randomx.Rx.IsCurrentSeed(reply.SeedHash) {
+		seed, _ := hex.DecodeString(reply.SeedHash)
+		randomx.Rx.NewSeed(seed)
+	}
+
 	return reply, err
 }
+
+// // jobHash= 24 bytes blob + 8 bytes timestamp
+// func (g *GetBlockTemplateReply) GetJobHash() string {
+// 	b := make([]byte, 8)
+// 	binary.BigEndian.PutUint64(b, uint64(g.Timestamp))
+// 	s := hex.EncodeToString(b)
+// 	return g.Blob[:48] + s
+// }
 
 func (r *RPCClient) GetInfo() (*GetInfoReply, error) {
 	params := make(map[string]interface{})

@@ -1,9 +1,6 @@
-# xmrpool
+# xdagPool
 
-High performance CryptoNote mining stratum with Web-interface written in Golang.
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/XDagger/xdagpool)](https://goreportcard.com/report/github.com/XDagger/xdagpool)
-[![CircleCI](https://circleci.com/gh/MiningPool0826/xmrpool.svg?style=svg)](https://circleci.com/gh/MiningPool0826/xmrpool)
+High performance xdag mining stratum with Web-interface written in Golang.
 
 **Stratum feature list:**
 
@@ -21,11 +18,11 @@ High performance CryptoNote mining stratum with Web-interface written in Golang.
 
 Dependencies:
 
-  * go-1.15
-  * Everything required to build Monero
-  * Monero >= **v0.17.0.0** (sometimes `master` branch required)
+  * go-1.20
+  * RandomX
 
-### Linux
+
+<!-- ### Linux
 
 Use Ubuntu 16.04 LTS.
 
@@ -102,7 +99,7 @@ Build stratum:
 If you need to bind to privileged ports and don't want to run from `root`:
 
     sudo apt-get install libcap2-bin
-    sudo setcap 'cap_net_bind_service=+ep' /path/to/xmrpool
+    sudo setcap 'cap_net_bind_service=+ep' /path/to/xmrpool -->
 
 ## Configuration
 
@@ -169,7 +166,7 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 
 You must use `anything.WorkerID` as username in your miner. Either disable address validation or use `<address>.WorkerID` as username. If there is no workerID specified your rig stats will be merged under `0` worker. If mining software contains dev fee rounds its stats will usually appear under `0` worker. This stratum acts like your own pool, the only exception is that you will get rewarded only after block found, shares only used for stats.
 
-### Donations
+<!-- ### Donations
 
 **XMR**: `47v4BWeUPFrM9YkYRYk2pkS9CubAPEc7BJjNjg4FvF66Y2oVrTAaBjDZhmFzAXgqCNRvBH2gupQ2gNag2FkP983ZMptvUWG`
 
@@ -181,4 +178,4 @@ Highly appreciated.
 
 Released under the GNU General Public License v2.
 
-http://www.gnu.org/licenses/gpl-2.0.html
+http://www.gnu.org/licenses/gpl-2.0.html -->
