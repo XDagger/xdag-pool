@@ -25,7 +25,7 @@ type BlockTemplate struct {
 }
 
 func (b *BlockTemplate) nextBlob(address string, extraNonce uint32, instanceId []byte) string {
-	// 32 bytes (reserved) = 24 bytes (wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId)
+	// 32 bytes (reserved) = 20 bytes (pool owner wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId) + 4bytes (share nonce)
 	blobBuff := make([]byte, len(b.buffer)*2)
 
 	copy(blobBuff, b.buffer)

@@ -60,7 +60,7 @@ func (cs *Session) getJob(t *BlockTemplate) *JobReplyData {
 	}
 
 	extraNonce := atomic.AddUint32(&cs.endpoint.extraNonce, 1) // increase extraNonce
-	blob := t.nextBlob(cs.login, extraNonce, cs.endpoint.instanceId)
+	blob := t.nextBlob(cs.address, extraNonce, cs.endpoint.instanceId)
 	id := atomic.AddUint64(&cs.endpoint.jobSequence, 1)
 	job := &Job{
 		id:         strconv.FormatUint(id, 10),
@@ -138,12 +138,12 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	hashrateExpiration time.Duration) bool {
 	r := s.rpc()
 
-	// 32 bytes (reserved) = 24 bytes (wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId)
+	// 32 bytes (reserved) = 20 bytes (pool owner wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId) + 4 bytes (share nonce)
 	shareBuff := make([]byte, len(t.buffer)*2)
 
 	copy(shareBuff, t.buffer)
 
-	addr, _, _ := base58.ChkDec(cs.login)
+	addr, _, _ := base58.ChkDec(s.config.Address)
 	copy(shareBuff[len(t.buffer):], addr[:len(addr)-4]) // without checksum bytes
 
 	enonce := make([]byte, 4)

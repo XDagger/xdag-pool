@@ -75,7 +75,7 @@ type Session struct {
 	ip  string
 
 	login   string
-	address []byte
+	address string
 	id      string
 	uid     string
 
@@ -258,7 +258,7 @@ func (e *Endpoint) Listen(s *StratumServer) {
 		}
 		_ = conn.SetKeepAlive(true)
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		cs := &Session{conn: conn, ip: ip, enc: json.NewEncoder(conn), endpoint: e}
+		cs := &Session{conn: conn, ip: ip, enc: json.NewEncoder(conn), endpoint: e, address: s.config.Address}
 		n += 1
 
 		accept <- n
@@ -313,7 +313,7 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 			continue
 		}
 
-		cs := &Session{tlsConn: tlsConn, ip: ip, enc: json.NewEncoder(conn), endpoint: e}
+		cs := &Session{tlsConn: tlsConn, ip: ip, enc: json.NewEncoder(conn), endpoint: e, address: s.config.Address}
 		n += 1
 
 		accept <- n
