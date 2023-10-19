@@ -1,0 +1,17 @@
+hashrate rank :  SortedHashrate : sortedset , util/sorted_hashrate.go
+    two sortedsets, switch every 15 minutes. reserve current set as last set, make a new current set.
+    key: miner's address, value: diff, accumulated when valid share found(miner.go: processShare->WriteBlock) .
+    get miners hashrate rank from last set.
+
+share exist : whether a share had been submitted before, util/share.go
+    two sets(map with empty struct value). switch every 15 minutes. reserve current set as last set, make a new current set.
+    key: miner's address+share params, stored when valid share found(miner.go: processShare->WriteBlock) .
+    check existence,when valid share found (miner.go: processShare->WriteBlock)
+
+redis zset store min rxhash of a job 
+    key: job hash, Z: (score : high 8 bytes of rxhash as uint64,  member: miner address)
+    add score into zset and delete all bigger score members, when valid share found.(miner.go: processShare->WriteBlock)
+    compare current share's rxhash and min rxhash in zset , submit share when it is smaller.(miner.go: processShare)
+
+redis hash store a miner's accumulated diff of a job
+ HIncrBy(ctx, r.formatKey(jobHash), login, diff)   (miner.go: processShare->WriteBlock)

@@ -1,30 +1,21 @@
 {
 	"addressEncrypted": "xePkFW8E5OhMuFg/FyQQqCFs2awuArs/QGEAyJcZ8X4mBV6FM+k1vER2WW6lMSUd1cP/ggTXR8j+43qVa+bNijZMdZyrohoT/7rNUj/toDFGVxzDTDtrRvVs9LbRGtIx",
-	"bypassAddressValidation": false,
-	"bypassShareValidation": false,
-
 	"threads": 16,
-	"coin": "xmr",
-
+	"coin": "xdag",
 	"estimationWindow": "15m",
 	"luckWindow": "24h",
 	"largeLuckWindow": "72h",
-
 	"blockRefreshInterval": "1s",
 	"hashRateExpiration": "3h",
-
 	"purgeInterval": "10m",
 	"hashrateWindow": "30m",
 	"hashrateLargeWindow": "3h",
-
 	"log": {
 		"logSetLevel": 10
 	},
-
 	"stratum": {
 		"enabled": true,
-
-		"timeout": "15m",
+		"timeout": "2m",
 		"listen": [
 			{
 				"host": "0.0.0.0",
@@ -34,11 +25,9 @@
 			}
 		]
 	},
-
 	"stratumTls": {
 		"enabled": true,
-
-		"timeout": "15m",
+		"timeout": "2m",
 		"listen": [
 			{
 				"host": "0.0.0.0",
@@ -47,11 +36,9 @@
 				"maxConn": 50000
 			}
 		],
-
 		"tlsCert": "certs/server.pem",
 		"tlsKey": "certs/server.key"
 	},
-
 	"frontend": {
 		"enabled": false,
 		"listen": "0.0.0.0:8082",
@@ -59,9 +46,7 @@
 		"password": "",
 		"hideIP": false
 	},
-
 	"upstreamCheckInterval": "5s",
-
 	"upstream": [
 		{
 			"name": "Main",
@@ -82,7 +67,6 @@
 			"timeout": "3s"
 		}
 	],
-
 	"redis": {
 		"enabled": false,
 		"endpoint": "127.0.0.1:6379",
@@ -90,19 +74,22 @@
 		"database": 0,
 		"passwordEncrypted": "oXyI5OTy+nRTshESi80X8KKSjDiLksuw1mhwRg2z0Ic="
 	},
-
 	"redisFailover": {
 		"enabled": true,
 		"masterName": "mymaster",
-		"sentinelEndpoints": ["192.168.33.166:26379", "192.168.26.83:26379", "192.168.33.243:26379"],
+		"sentinelEndpoints": [
+			"192.168.33.166:26379",
+			"192.168.26.83:26379",
+			"192.168.33.243:26379"
+		],
 		"poolSize": 10,
 		"database": 0,
 		"passwordEncrypted": "oXyI5OTy+nRTshESi80X8KKSjDiLksuw1mhwRg2z0Ic="
 	},
-
 	"unlocker": {
 		"enabled": true,
 		"poolFee": 1.0,
+		"donateFee": 1.0,
 		"poolFeeAddress": "",
 		"donate": false,
 		"depth": 6,
@@ -113,10 +100,5 @@
 		"daemonHost": "192.168.33.166",
 		"daemonPort": 18081,
 		"timeout": "10s"
-	},
-
-	"newrelicEnabled": false,
-	"newrelicName": "MyStratum",
-	"newrelicKey": "SECRET_KEY",
-	"newrelicVerbose": false
+	}
 }

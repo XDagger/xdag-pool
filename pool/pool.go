@@ -22,6 +22,7 @@ type StorageConfigFailover struct {
 type UnlockerConfig struct {
 	Enabled        bool    `json:"enabled"`
 	PoolFee        float64 `json:"poolFee"`
+	DonateFee      float64 `json:"donateFee"`
 	PoolFeeAddress string  `json:"poolFeeAddress"`
 	Donate         bool    `json:"donate"`
 	Depth          int64   `json:"depth"`
@@ -35,20 +36,18 @@ type UnlockerConfig struct {
 }
 
 type Config struct {
-	AddressEncrypted        string     `json:"addressEncrypted"`
-	Address                 string     `json:"-"`
-	BypassAddressValidation bool       `json:"bypassAddressValidation"`
-	BypassShareValidation   bool       `json:"bypassShareValidation"`
-	Log                     Log        `json:"log"`
-	Stratum                 Stratum    `json:"stratum"`
-	StratumTls              StratumTls `json:"stratumTls"`
-	BlockRefreshInterval    string     `json:"blockRefreshInterval"`
-	UpstreamCheckInterval   string     `json:"upstreamCheckInterval"`
-	Upstream                []Upstream `json:"upstream"`
-	EstimationWindow        string     `json:"estimationWindow"`
-	LuckWindow              string     `json:"luckWindow"`
-	LargeLuckWindow         string     `json:"largeLuckWindow"`
-	HashRateExpiration      string     `json:"hashRateExpiration"`
+	AddressEncrypted      string     `json:"addressEncrypted"`
+	Address               string     `json:"-"`
+	Log                   Log        `json:"log"`
+	Stratum               Stratum    `json:"stratum"`
+	StratumTls            StratumTls `json:"stratumTls"`
+	BlockRefreshInterval  string     `json:"blockRefreshInterval"`
+	UpstreamCheckInterval string     `json:"upstreamCheckInterval"`
+	Upstream              []Upstream `json:"upstream"`
+	EstimationWindow      string     `json:"estimationWindow"`
+	LuckWindow            string     `json:"luckWindow"`
+	LargeLuckWindow       string     `json:"largeLuckWindow"`
+	HashRateExpiration    string     `json:"hashRateExpiration"`
 
 	PurgeInterval       string `json:"purgeInterval"`
 	HashrateWindow      string `json:"hashrateWindow"`
@@ -62,11 +61,6 @@ type Config struct {
 	RedisFailover StorageConfigFailover `json:"redisFailover"`
 
 	BlockUnlocker UnlockerConfig `json:"unlocker"`
-
-	NewrelicName    string `json:"newrelicName"`
-	NewrelicKey     string `json:"newrelicKey"`
-	NewrelicVerbose bool   `json:"newrelicVerbose"`
-	NewrelicEnabled bool   `json:"newrelicEnabled"`
 }
 
 type Stratum struct {

@@ -19,7 +19,7 @@ func init() {
 
 func (s *StratumServer) handleLoginRPC(cs *Session, params *LoginParams) (*JobReply, *ErrorReply) {
 	address, id := extractWorkerId(params.Login, params.Pass)
-	if !s.config.BypassAddressValidation && !util.ValidateAddress(address) {
+	if !util.ValidateAddress(address) {
 		util.Error.Printf("Invalid address %s used for login by %s", address, cs.ip)
 		return nil, &ErrorReply{Code: -1, Message: "Invalid address used for login"}
 	}

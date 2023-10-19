@@ -50,6 +50,7 @@ func (m *shares) Set(key string) {
 	(*m.Current)[key] = struct{}{}
 }
 
+// check duplicated shares
 func (m *shares) ShareExist(key string) bool {
 	m.curLock.RLock()
 	defer m.curLock.RUnlock()

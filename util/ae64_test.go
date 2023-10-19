@@ -16,8 +16,10 @@ func TestAe64Encode(t *testing.T) {
 }
 
 func TestAe64Decode(t *testing.T) {
-	src := "bg2Z2F+OA6LTR5VQjsOiLOH2YqSiFbETBQWlZ25nt51UsZrrRqWSvWJT4yX6Oz5r"
-	src2 := "nuaXMECKl3fLIRwzJyKXHA=="
+	// src := "bg2Z2F+OA6LTR5VQjsOiLOH2YqSiFbETBQWlZ25nt51UsZrrRqWSvWJT4yX6Oz5r"
+	// src2 := "nuaXMECKl3fLIRwzJyKXHA=="
+	src := "ntr5fRwReQRQ7U2RAv4EzjMtXo/kazyl/bWaQyirr8sjM8B38/vZC/0+IPkRNKqg"
+	src2 := "XAhBZ5thsGAzhnxJwwPgiQ=="
 	key := []byte("12345678")
 	orgi, _ := Ae64Decode(src, key)
 	orgi2, _ := Ae64Decode(src2, key)

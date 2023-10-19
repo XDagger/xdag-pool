@@ -3,6 +3,7 @@ package kvstore
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -65,11 +66,11 @@ func (r *KvClient) writeShare(tx redis.Pipeliner, ms, ts int64, login, id string
 	tx.ZAdd(ctx, r.formatKey("hashrate"), redis.Z{Score: float64(ts), Member: join(diff, login, id, ms)})
 	tx.ZAdd(ctx, r.formatKey("hashrate", login), redis.Z{Score: float64(ts), Member: join(diff, id, ms)})
 	tx.Expire(ctx, r.formatKey("hashrate", login), expire) // Will delete hashrates for miners that gone
-	tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
+	// tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
 }
 
-func (r *KvClient) WriteBlock(login, id string, params []string, diff, roundDiff int64, height uint64,
-	timestamp uint64, window time.Duration) (bool, error) {
+func (r *KvClient) WriteBlock(login, id string, params []string, diff, roundDiff int64, shareU64 uint64,
+	timestamp uint64, window time.Duration, jobHash string) (bool, error) {
 	// exist, err := r.checkPoWExist(login, params)
 	// if err != nil {
 	// 	return false, err
@@ -80,9 +81,9 @@ func (r *KvClient) WriteBlock(login, id string, params []string, diff, roundDiff
 	if exist {
 		return true, nil
 	}
-	util.MinedShares.Set(sharesKey)
-	util.HashrateRank.IncShareByKey(login, diff)
-	util.HashrateRank.IncShareByKey("total", diff)
+	util.MinedShares.Set(sharesKey)                // set share existence
+	util.HashrateRank.IncShareByKey(login, diff)   // accumulated for hashrate rank
+	util.HashrateRank.IncShareByKey("total", diff) // accumulated for total hashrate
 
 	tx := r.client.TxPipeline()
 	// defer tx.Close()
@@ -91,28 +92,58 @@ func (r *KvClient) WriteBlock(login, id string, params []string, diff, roundDiff
 	ts := ms / 1000
 
 	r.writeShare(tx, ms, ts, login, id, diff, window)
-	tx.HSet(ctx, r.formatKey("stats"), "lastBlockFound", strconv.FormatInt(ts, 10))
-	tx.HDel(ctx, r.formatKey("stats"), "roundShares")
-	tx.ZIncrBy(ctx, r.formatKey("finders"), 1, login)
-	tx.HIncrBy(ctx, r.formatKey("miners", login), "blocksFound", 1)
-	tx.Rename(ctx, r.formatKey("shares", "roundCurrent"), r.formatRound(int64(height), params[0]))
-	tx.HGetAll(ctx, r.formatRound(int64(height), params[0]))
+	tx.HSet(ctx, r.formatKey("works", login+"."+id), "lastShare", strconv.FormatInt(ts, 10))
+	tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
+	tx.HSet(ctx, r.formatKey("stats"), "lastShare", strconv.FormatInt(ts, 10))
+	// tx.HDel(ctx, r.formatKey("stats"), "roundShares")
+	// tx.ZIncrBy(ctx, r.formatKey("finders"), 1, login)
+	// tx.HIncrBy(ctx, r.formatKey("miners", login), "blocksFound", 1)
 
-	cmds, err := tx.Exec(ctx)
+	// tx.Rename(ctx, r.formatKey("shares", "roundCurrent"), r.formatRound(int64(height), params[0]))
+	// tx.HGetAll(ctx, r.formatRound(int64(height), params[0]))
+	tx.HIncrBy(ctx, r.formatKey(jobHash), login, diff) // accumulate miners diff of the job (identified by job hash)
+	tx.ZAdd(ctx, r.formatKey(jobHash), redis.Z{Score: float64(shareU64), Member: login})
+	tx.ZRemRangeByRank(ctx, r.formatKey(jobHash), 1, -1) // delete bigger hash, remain min hash and its miner address
+
+	// cmds, err := tx.Exec(ctx)
+	_, err := tx.Exec(ctx)
 	if err != nil {
 		return false, err
-	} else {
-		sharesMap, _ := cmds[10].(*redis.MapStringStringCmd).Result()
-		totalShares := int64(0)
-		for _, v := range sharesMap {
-			n, _ := strconv.ParseInt(v, 10, 64)
-			totalShares += n
-		}
-		hashHex := strings.Join(params, ":")
-		s := join(hashHex, ts, roundDiff, totalShares)
-		cmd := r.client.ZAdd(ctx, r.formatKey("blocks", "candidates"), redis.Z{Score: float64(height), Member: s})
-		return false, cmd.Err()
 	}
+	// else {
+	// 	sharesMap, _ := cmds[10].(*redis.MapStringStringCmd).Result()
+	// 	totalShares := int64(0)
+	// 	for _, v := range sharesMap {
+	// 		n, _ := strconv.ParseInt(v, 10, 64)
+	// 		totalShares += n
+	// 	}
+	// 	hashHex := strings.Join(params, ":")
+	// 	s := join(hashHex, ts, roundDiff, totalShares)
+	// 	cmd := r.client.ZAdd(ctx, r.formatKey("blocks", "candidates"), redis.Z{Score: float64(height), Member: s})
+	// 	return false, cmd.Err()
+	// }
+	return false, nil
+}
+func (r *KvClient) SetReward(login, txHash, jobHash string, reward float64, ms, ts int64) error {
+	tx := r.client.TxPipeline()
+	tx.HIncrBy(ctx, r.formatKey("account", login), "reward", int64(reward*1e9))
+	tx.HIncrBy(ctx, r.formatKey("account", login), "unpaid", int64(reward*1e9))
+	tx.ZAdd(ctx, r.formatKey("rewards", login), redis.Z{Score: float64(ts), Member: join(reward, ms, txHash, jobHash)})
+	tx.ZAdd(ctx, r.formatKey("balance", login), redis.Z{Score: float64(ts), Member: join("reward", reward, ms, txHash, jobHash)})
+	_, err := tx.Exec(ctx)
+	return err
+}
+
+func (r *KvClient) SetPayment(login, txHash string, payment float64, ms, ts int64) error {
+	tx := r.client.TxPipeline()
+	tx.HIncrBy(ctx, r.formatKey("account", login), "payment", int64(payment*1e9))
+	tx.HIncrBy(ctx, r.formatKey("account", login), "unpaid", -1*int64(payment*1e9))
+	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "payment", int64(payment*1e9))
+	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "unpaid", -1*int64(payment*1e9))
+	tx.ZAdd(ctx, r.formatKey("payment", login), redis.Z{Score: float64(ts), Member: join(payment, ms, txHash)})
+	tx.ZAdd(ctx, r.formatKey("balance", login), redis.Z{Score: float64(ts), Member: join("payment", payment, ms, txHash)})
+	_, err := tx.Exec(ctx)
+	return err
 }
 
 // WARNING: Must run it periodically to flush out of window hashrate entries
@@ -164,6 +195,18 @@ func (r *KvClient) FlushStaleStats(window, largeWindow time.Duration) (int64, er
 	}
 
 	return total, nil
+}
+
+// get min share rxhash  (high 8 bytes of rxhash as uint64) of a job
+func (r *KvClient) GetMinShare(jobHash string) uint64 {
+	z, err := r.client.ZRangeWithScores(ctx, r.formatKey(jobHash), 0, 0).Result()
+	if err != nil || len(z) < 1 {
+		util.Error.Printf("Get %s min share failed %v", jobHash, err)
+		util.BlockLog.Printf("Get %s min share failed %v", jobHash, err)
+		return math.MaxUint64
+	}
+
+	return uint64(z[0].Score)
 }
 
 func (r *KvClient) formatKey(args ...interface{}) string {
