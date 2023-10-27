@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -19,11 +20,16 @@ import (
 	"github.com/gorilla/mux"
 	"golang.org/x/term"
 
+	"github.com/XDagger/xdagpool/xdago/base58"
+	"github.com/XDagger/xdagpool/xdago/cryptography"
+	bip "github.com/XDagger/xdagpool/xdago/wallet"
+
 	"github.com/XDagger/xdagpool/kvstore"
 	"github.com/XDagger/xdagpool/payouts"
 	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/stratum"
 	"github.com/XDagger/xdagpool/util"
+	"github.com/XDagger/xdagpool/xdago/common"
 )
 
 var (
@@ -131,6 +137,27 @@ func readSecurityPass() ([]byte, error) {
 	return SecurityPass, nil
 }
 
+func readWalletPass() ([]byte, error) {
+	fmt.Printf("Enter Wallet Password: ")
+	var fd int
+	if term.IsTerminal(int(syscall.Stdin)) {
+		fd = int(syscall.Stdin)
+	} else {
+		tty, err := os.Open("/dev/tty")
+		if err != nil {
+			return nil, errors.New("error allocating terminal")
+		}
+		defer tty.Close()
+		fd = int(tty.Fd())
+	}
+
+	WalletPass, err := term.ReadPassword(fd)
+	if err != nil {
+		return nil, err
+	}
+	return WalletPass, nil
+}
+
 func decryptPoolConfigure(cfg *pool.Config, passBytes []byte) error {
 	b, err := util.Ae64Decode(cfg.AddressEncrypted, passBytes)
 	if err != nil {
@@ -209,6 +236,20 @@ func main() {
 		util.Error.Fatal("Decrypt Pool Configure error: ", err.Error())
 	}
 
+	walletPass, err := readWalletPass()
+	if err != nil {
+		util.Error.Fatal("Read Wallet Password error: ", err.Error())
+	}
+
+	hasWallet, bigAddress := connectBipWallet(string(walletPass[:]))
+	if !hasWallet {
+		util.Error.Fatal("Read Wallet files error")
+	}
+
+	if bigAddress != cfg.Address {
+		util.Error.Fatal("Wallet Account Address and Pool Address in Config File are not equal.")
+	}
+
 	if cfg.Redis.Enabled {
 		backend = kvstore.NewKvClient(&cfg.Redis, cfg.Coin)
 	} else if cfg.RedisFailover.Enabled {
@@ -239,3 +280,23 @@ func main() {
 	//startNewrelic()
 	startStratum()
 }
+
+func connectBipWallet(password string) (bool, string) {
+	util.Info.Println("Initializing cryptography...")
+	util.Info.Println("Reading wallet...")
+	pwd, _ := os.Executable()
+	pwd = filepath.Dir(pwd)
+	wallet := bip.NewWallet(path.Join(pwd, common.BIP32_WALLET_FOLDER, common.BIP32_WALLET_FILE_NAME))
+	res := wallet.UnlockWallet(password)
+	if res && wallet.IsHdWalletInitialized() {
+		payouts.BipWallet = &wallet
+		payouts.BipKey = payouts.BipWallet.GetDefKey()
+		b := cryptography.ToBytesAddress(payouts.BipWallet.GetDefKey())
+		bipAddress := base58.ChkEnc(b[:])
+		payouts.BipAddress = bipAddress
+		return true, bipAddress
+	}
+	return false, ""
+}
+
+func getBipAddress()

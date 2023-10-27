@@ -7,7 +7,7 @@ package base58_test
 import (
 	"fmt"
 
-	"github.com/XDagger/xdagpool/base58"
+	"github.com/XDagger/xdagpool/xdago/base58"
 )
 
 // This example demonstrates how to decode modified base58 encoded data.

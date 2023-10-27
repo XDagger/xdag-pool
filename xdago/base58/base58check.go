@@ -68,7 +68,7 @@ func ChkDec(input string) (result []byte, version byte, err error) {
 	return
 }
 
-// ChkEnc encode 20 bytes into base58 address with check sum
+// ChkEnc  appends a four byte checksum.
 func ChkEnc(input []byte) string {
 	b := make([]byte, 0, len(input)+4)
 	b = append(b, input...)

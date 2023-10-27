@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/XDagger/xdagpool/base58"
+	"github.com/XDagger/xdagpool/xdago/base58"
 )
 
 var stringTests = []struct {

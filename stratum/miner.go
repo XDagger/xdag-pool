@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/XDagger/xdagpool/base58"
 	"github.com/XDagger/xdagpool/util"
+	"github.com/XDagger/xdagpool/xdago/base58"
 )
 
 type Job struct {

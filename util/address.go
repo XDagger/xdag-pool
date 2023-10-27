@@ -1,6 +1,6 @@
 package util
 
-import "github.com/XDagger/xdagpool/base58"
+import "github.com/XDagger/xdagpool/xdago/base58"
 
 func ValidateAddress(address string) bool {
 	_, _, err := base58.ChkDec(address)
