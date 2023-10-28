@@ -60,6 +60,7 @@ type Config struct {
 	Redis         StorageConfig         `json:"redis"`
 	RedisFailover StorageConfigFailover `json:"redisFailover"`
 
+	NodeRpc       string         `json:"node_rpc"`
 	BlockUnlocker UnlockerConfig `json:"unlocker"`
 }
 
