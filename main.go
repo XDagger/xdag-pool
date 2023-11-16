@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -9,10 +10,12 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"sync"
 	"syscall"
 	"time"
 
@@ -215,6 +218,11 @@ func main() {
 	readConfig(&cfg)
 	rand.Seed(time.Now().UTC().UnixNano())
 
+	// graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	var wg sync.WaitGroup
+
 	// init log file
 	_ = os.Mkdir("logs", os.ModePerm)
 	iLogFile := "logs/info.log"
@@ -276,9 +284,17 @@ func main() {
 	if cfg.BlockUnlocker.Enabled {
 		go startBlockUnlocker()
 	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		payouts.PaymentTask(ctx, &cfg, backend)
+	}()
 
 	//startNewrelic()
 	startStratum()
+
+	wg.Wait()
+	fmt.Println("Stratum server shutdown.")
 }
 
 func connectBipWallet(password string) (bool, string) {

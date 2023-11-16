@@ -148,9 +148,9 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 
 	enonce := make([]byte, 4)
 	binary.BigEndian.PutUint32(enonce, job.extraNonce)
-	copy(shareBuff[len(t.buffer)+len(addr)-4:], enonce[:])
+	copy(shareBuff[len(t.buffer)+len(addr)-4:], enonce[:]) // 4 bytes
 
-	copy(shareBuff[len(t.buffer)+len(addr):], cs.endpoint.instanceId[:])
+	copy(shareBuff[len(t.buffer)+len(addr):], cs.endpoint.instanceId[:]) // 4 bytes
 
 	nonceBuff, _ := hex.DecodeString(nonce) // 32bits (4 bytes) share nonce sent by miner
 	copy(shareBuff[60:], nonceBuff[:4])
@@ -174,16 +174,18 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 
 	block := hashDiff.Cmp(cs.endpoint.difficulty) >= 0
 
-	nonceHex := hex.EncodeToString(nonceBuff)
-	extraHex := hex.EncodeToString(enonce)
-	instanceIdHex := hex.EncodeToString(cs.endpoint.instanceId)
-	paramIn := []string{nonceHex, extraHex, instanceIdHex}
+	// nonceHex := hex.EncodeToString(nonceBuff)
+	// extraHex := hex.EncodeToString(enonce)
+	// instanceIdHex := hex.EncodeToString(cs.endpoint.instanceId)
+	// paramIn := []string{nonceHex, extraHex, instanceIdHex}
+	share := hex.EncodeToString(shareBuff[len(t.buffer):])
 
 	if block {
-		minShare := s.backend.GetMinShare(t.jobHash)
 		shareU64 := binary.LittleEndian.Uint64(hashBytes[24:32]) // share hash high 8 bytes to uint64 used to compare hash
+		minShare := s.backend.IsMinShare(t.jobHash, cs.login, share, shareU64)
+
 		// block
-		if shareU64 < minShare {
+		if minShare {
 			_, err := r.SubmitBlock(hex.EncodeToString(shareBuff)) //TODO: send pool address + share
 			if err != nil {
 				atomic.AddInt64(&m.rejects, 1)
@@ -210,7 +212,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 		atomic.AddInt64(&r.Accepts, 1)
 		atomic.StoreInt64(&r.LastSubmissionAt, now)
 
-		exist, err := s.backend.WriteBlock(cs.login, cs.id, paramIn, cs.endpoint.difficulty.Int64(),
+		exist, err := s.backend.WriteBlock(cs.login, cs.id, share, cs.endpoint.difficulty.Int64(),
 			t.diffInt64, shareU64, t.timestamp, hashrateExpiration, t.jobHash)
 		if exist {
 			ms := util.MakeTimestamp()

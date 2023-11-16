@@ -9,9 +9,51 @@ share exist : whether a share had been submitted before, util/share.go
     check existence,when valid share found (miner.go: processShare->WriteBlock)
 
 redis zset store min rxhash of a job 
-    key: job hash, Z: (score : high 8 bytes of rxhash as uint64,  member: miner address)
+    key: "mini" + job hash, Z: (score : high 8 bytes of rxhash as uint64,  member: miner address)
     add score into zset and delete all bigger score members, when valid share found.(miner.go: processShare->WriteBlock)
-    compare current share's rxhash and min rxhash in zset , submit share when it is smaller.(miner.go: processShare)
+    compare current share's rxhash and min rxhash in zset , submit current share when it is smaller.(miner.go: processShare)
+
+redis set store jobs(win, lost ,waiting)
+key: "waiting" , values: jobHashes that pool waiting for result
+key: "win", values: jobHashes that pool winned reward
+key: "lost", values: jobHashes that  pool failed reward
+
+redis set store submitted shares
+key: jobHash , values: submitted shares
 
 redis hash store a miner's accumulated diff of a job
- HIncrBy(ctx, r.formatKey(jobHash), login, diff)   (miner.go: processShare->WriteBlock)
+HIncrBy(ctx, r.formatKey("job",jobHash), login, diff)   (miner.go: processShare->WriteBlock)
+
+redis hash store a pool's accumulated diff of a job
+ HIncrBy(ctx, r.formatKey("pool","diff"), jobHash, diff)   (miner.go: processShare->WriteBlock)
+
+redis zset store pool rewards list from xdaxj (ts -> timestamp)(int64, [real value] * 1e9)
+ key: "pool" + "rewards", Z:{Score: float64(ts), Member: join(reword, ms, txHash, joHash, fee, share)} 
+
+redis zset store rewards list of a task (ts -> timestamp)(int64, [real value] * 1e9)
+ key: "rewards" + joHash, Z:{Score: float64(ts), Member: join(reword, ms, miner, remark, mode)}  
+
+redis hash store a pool's total rewards from xdagj(int64, [real value] * 1e9)
+ key: "pool" + "account",  field: "rewards",  value: total rewards from xdagj
+ 
+redis hash store a pool's total payment to miners(int64, [real value] * 1e9)
+ key: "pool" + "account",  field: "payment",  value: total payment to miners
+ 
+redis hash store a pool's total unpaid rewards(int64, [real value] * 1e9)
+ key: "pool" + "account",  field: "unpaid",  value: total unpaid
+ 
+redis hash store miners balance (int64, [real value] * 1e9) (miner.go: processShare->WriteBlock)
+    key: "account" + miner address,  field: "reward",  value: total reward to miner
+    key: "account" + miner address,  field: "unpaid",  value: total unpaid amount 
+    key: "account" + miner address,  field: "payment",  value: total paid amount
+
+redis zset store rewards list to a miner (ts -> timestamp)(int64, [real value] * 1e9)
+ key: "rewards" + miner address, Z:{Score: float64(ts), Member: join(reword, ms, jobHash, remark, mode)}    
+
+redis zset store payment list to a miner (ts -> timestamp)(int64, [real value] * 1e9)
+ key: "payment" + miner address, Z:{Score: float64(ts), Member: join(payment, ms, txHash, remark)}
+
+redis zset store balance changing list of a miner (ts -> timestamp)(int64, [real value] * 1e9)
+ key: "balance" + miner address, Z:{Score: float64(ts), Member: join("payment", payment, ms, txHash, remark)}
+ key: "balance" + miner address, Z:{Score: float64(ts), Member: join("reward", reward, ms, txHash, remark)}
+ 

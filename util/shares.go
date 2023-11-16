@@ -43,17 +43,17 @@ func (m *shares) Next() {
 	m.Current = m.set[n]
 }
 
-func (m *shares) Set(key string) {
-	m.curLock.Lock()
-	defer m.curLock.Unlock()
+// func (m *shares) Set(key string) {
+// 	m.curLock.Lock()
+// 	defer m.curLock.Unlock()
 
-	(*m.Current)[key] = struct{}{}
-}
+// 	(*m.Current)[key] = struct{}{}
+// }
 
 // check duplicated shares
 func (m *shares) ShareExist(key string) bool {
-	m.curLock.RLock()
-	defer m.curLock.RUnlock()
+	m.curLock.Lock()
+	defer m.curLock.Unlock()
 
 	m.lastLock.RLock()
 	defer m.lastLock.RUnlock()
@@ -63,6 +63,10 @@ func (m *shares) ShareExist(key string) bool {
 	var ok2 bool
 	if m.Last != nil {
 		_, ok2 = (*m.Last)[key]
+	}
+
+	if !ok1 && !ok2 {
+		(*m.Current)[key] = struct{}{}
 	}
 
 	return ok1 || ok2

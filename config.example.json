@@ -88,17 +88,17 @@
 	},
 	"unlocker": {
 		"enabled": true,
-		"poolFee": 1.0,
-		"donateFee": 1.0,
-		"poolFeeAddress": "",
-		"donate": false,
-		"depth": 6,
-		"immatureDepth": 3,
+		"poolRation": 5.0,
+		"fundRation": 5.0,
+		"rewardRation": 5.0,
+		"directRation": 5.0,
+		"threshold": 3,
+		"paymentInterval": "10m",
 		"keepTxFees": false,
-		"interval": "10m",
-		"daemonName": "unlocker",
-		"daemonHost": "192.168.33.166",
-		"daemonPort": 18081,
+		"mode": "equal",
+		"paymentRemark": "http://mypool.com",
+		"xdagjHost": "https://mainnet-rpc.xdagj.org",
+		"xdagjPort": 80,
 		"timeout": "10s"
 	}
 }

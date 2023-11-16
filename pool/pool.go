@@ -20,19 +20,21 @@ type StorageConfigFailover struct {
 }
 
 type UnlockerConfig struct {
-	Enabled        bool    `json:"enabled"`
-	PoolFee        float64 `json:"poolFee"`
-	DonateFee      float64 `json:"donateFee"`
-	PoolFeeAddress string  `json:"poolFeeAddress"`
-	Donate         bool    `json:"donate"`
-	Depth          int64   `json:"depth"`
-	ImmatureDepth  int64   `json:"immatureDepth"`
-	KeepTxFees     bool    `json:"keepTxFees"`
-	Interval       string  `json:"interval"`
-	DaemonName     string  `json:"daemonName"`
-	DaemonHost     string  `json:"daemonHost"`
-	DaemonPort     int     `json:"daemonPort"`
-	Timeout        string  `json:"timeout"`
+	Enabled         bool    `json:"enabled"`
+	PoolRation      float64 `json:"poolRation"`
+	FundRation      float64 `json:"fundRation"`
+	RewardRation    float64 `json:"rewardRation"`
+	DirectRation    float64 `json:"directRation"`
+	PoolFeeAddress  string  `json:"poolFeeAddress"`
+	Donate          bool    `json:"donate"`
+	Threshold       int64   `json:"threshold"`
+	PaymentInterval string  `json:"paymentInterval"`
+	KeepTxFees      bool    `json:"keepTxFees"`
+	Mode            string  `json:"mode"`
+	PaymentRemark   string  `json:"paymentRemark"`
+	DaemonHost      string  `json:"daemonHost"`
+	DaemonPort      int     `json:"daemonPort"`
+	Timeout         string  `json:"timeout"`
 }
 
 type Config struct {
@@ -102,4 +104,13 @@ type Frontend struct {
 
 type Log struct {
 	LogSetLevel int `json:"logSetLevel"`
+}
+
+// ws reward message from xdaj
+type XdagjReward struct {
+	TxBlock string  `json:"txBlock"`
+	PreHash string  `json:"preHash"`
+	Share   string  `json:"share"`
+	Amount  float64 `json:"amount"`
+	Fee     float64 `json:"fee"`
 }
