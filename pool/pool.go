@@ -23,16 +23,15 @@ type PayOutConfig struct {
 }
 
 type Config struct {
-	AddressEncrypted string     `json:"addressEncrypted"`
-	Address          string     `json:"-"`
-	Log              Log        `json:"log"`
-	Stratum          Stratum    `json:"stratum"`
-	StratumTls       StratumTls `json:"stratumTls"`
-	// BlockRefreshInterval string     `json:"blockRefreshInterval"`
-	EstimationWindow   string `json:"estimationWindow"`
-	LuckWindow         string `json:"luckWindow"`
-	LargeLuckWindow    string `json:"largeLuckWindow"`
-	HashRateExpiration string `json:"hashRateExpiration"`
+	AddressEncrypted   string     `json:"addressEncrypted"`
+	Address            string     `json:"-"`
+	Log                Log        `json:"log"`
+	Stratum            Stratum    `json:"stratum"`
+	StratumTls         StratumTls `json:"stratumTls"`
+	EstimationWindow   string     `json:"estimationWindow"`
+	LuckWindow         string     `json:"luckWindow"`
+	LargeLuckWindow    string     `json:"largeLuckWindow"`
+	HashRateExpiration string     `json:"hashRateExpiration"`
 
 	PurgeInterval       string `json:"purgeInterval"`
 	HashrateWindow      string `json:"hashrateWindow"`

@@ -10,8 +10,8 @@
 	"hashrateWindow": "30m",
 	"hashrateLargeWindow": "3h",
 	"node_name": "example.equal",
-	"node_rpc": "https://mainnet-rpc.xdagj.org",
-	"node_ws": "ws://mainnet-rpc.xdagj.org",
+	"node_rpc": "https://test-rpc.xdagj.org",
+	"node_ws": "ws://test-rpc.xdagj.org",
 	"ws_ssl": false,
 	"log": {
 		"logSetLevel": 10
@@ -29,7 +29,7 @@
 		]
 	},
 	"stratumTls": {
-		"enabled": true,
+		"enabled": false,
 		"timeout": "2m",
 		"listen": [
 			{
