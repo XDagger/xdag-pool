@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -26,17 +27,6 @@ func NewKvClient(cfg *pool.StorageConfig, prefix string) *KvClient {
 		Password: cfg.Password,
 		DB:       int(cfg.Database),
 		PoolSize: cfg.PoolSize,
-	})
-	return &KvClient{client: client, prefix: prefix}
-}
-
-func NewKvFailoverClient(cfg *pool.StorageConfigFailover, prefix string) *KvClient {
-	client := redis.NewFailoverClient(&redis.FailoverOptions{
-		MasterName:    cfg.MasterName,
-		SentinelAddrs: cfg.SentinelEndpoints,
-		Password:      cfg.Password,
-		DB:            int(cfg.Database),
-		PoolSize:      cfg.PoolSize,
 	})
 	return &KvClient{client: client, prefix: prefix}
 }
@@ -68,7 +58,7 @@ func (r *KvClient) writeShare(tx redis.Pipeliner, ms, ts int64, login, id string
 	// tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
 }
 
-func (r *KvClient) WriteBlock(login, id, share string, diff, roundDiff int64, shareU64 uint64,
+func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint64,
 	timestamp uint64, window time.Duration, jobHash string) (bool, error) {
 	// exist, err := r.checkPoWExist(login, params)
 	// if err != nil {
@@ -133,20 +123,26 @@ func (r *KvClient) SetMinerReward(login, txHash, jobHash string, reward float64,
 }
 
 func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts int64) error {
+	res, err := r.client.SMove(ctx, "waiting", "win", reward.PreHash).Result()
+	if err != nil {
+		return err
+	}
+	if !res { // preHash not in waiting set
+		return errors.New("moved key not exist in source")
+	}
 	tx := r.client.TxPipeline()
-	tx.SMove(ctx, "waiting", "win", reward.PreHash)
 	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "rewards", int64(reward.Amount*1e9))
 	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "unpaid", int64(reward.Amount*1e9))
 	tx.ZAdd(ctx, r.formatKey("pool", "rewards"), redis.Z{Score: float64(ts),
 		Member: join(reward.Amount, reward.Fee, ms, reward.TxBlock, reward.PreHash, login, reward.Share)})
-	_, err := tx.Exec(ctx)
+	_, err = tx.Exec(ctx)
 	return err
 }
 
 func (r *KvClient) SetLostReward(login string, reward pool.XdagjReward, ms, ts int64) {
 	_, err := r.client.SMove(ctx, "waiting", "lost", reward.PreHash).Result()
 	if err != nil {
-		util.Error.Println("store lost set error", reward.PreHash)
+		util.Error.Println("store lost set error", reward.PreHash, err)
 	}
 }
 
@@ -239,7 +235,7 @@ func (r *KvClient) IsMinShare(jobHash, login, share string, shareU64 uint64) boo
 	}
 	z, _ := cmds[1].(*redis.ZSliceCmd).Result()
 	if z[0].Score == float64(shareU64) { // TODO: float64 equality estimation
-		_, err := r.client.SAdd(ctx, jobHash, share).Result() //store submitted share
+		_, err := r.client.SAdd(ctx, r.formatKey("submit", jobHash), share).Result() //store submitted share
 		if err != nil {
 			util.Error.Println("store submitted share error", err)
 		}
@@ -249,7 +245,7 @@ func (r *KvClient) IsMinShare(jobHash, login, share string, shareU64 uint64) boo
 }
 
 func (r *KvClient) IsPoolShare(jobHash, share string) bool {
-	ok, err := r.client.SIsMember(ctx, jobHash, share).Result()
+	ok, err := r.client.SIsMember(ctx, r.formatKey("submit", jobHash), share).Result()
 	if err != nil {
 		util.Error.Println("check pool submitted share error", err)
 		return false
@@ -313,6 +309,7 @@ func (r *KvClient) GetMinerName(jobHash string) []string {
 
 // set lowest hash finder reward of a job
 func (r *KvClient) SetFinderReward(login string, reward pool.XdagjReward, fee float64, ms, ts int64) {
+	// minimum hash finder
 	raw, err := r.client.ZRange(ctx, r.formatKey("mini", reward.PreHash), 0, 0).Result()
 	if err == nil {
 		util.Error.Println("get lowest hash finder by job error", reward.PreHash, err)

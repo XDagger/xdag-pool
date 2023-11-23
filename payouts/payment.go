@@ -12,7 +12,7 @@ import (
 var backend *kvstore.KvClient = nil
 
 func PaymentTask(ctx context.Context, cfg *pool.Config, backend *kvstore.KvClient) {
-	interval, err := time.ParseDuration(cfg.BlockUnlocker.PaymentInterval)
+	interval, err := time.ParseDuration(cfg.PayOut.PaymentInterval)
 	if err != nil {
 		interval = 10 * time.Minute
 	}
@@ -30,13 +30,13 @@ func PaymentTask(ctx context.Context, cfg *pool.Config, backend *kvstore.KvClien
 
 func payMiners(cfg *pool.Config, backend *kvstore.KvClient) {
 	// find miners balance more than payment threshold
-	miners := backend.GetMinersToPay(cfg.BlockUnlocker.Threshold)
-	if miners == nil || len(miners) == 0 {
+	miners := backend.GetMinersToPay(cfg.PayOut.Threshold)
+	if len(miners) == 0 {
 		return
 	}
 	for address, amount := range miners {
 		if amount > 0 {
-			payMiner(backend, address, cfg.BlockUnlocker.PaymentRemark, float64(amount)/float64(1e9))
+			payMiner(backend, address, cfg.PayOut.PaymentRemark, float64(amount)/float64(1e9))
 		}
 	}
 }

@@ -19,7 +19,7 @@ key: "win", values: jobHashes that pool winned reward
 key: "lost", values: jobHashes that  pool failed reward
 
 redis set store submitted shares
-key: jobHash , values: submitted shares
+key: "submit" +jobHash , values: submitted shares
 
 redis hash store a miner's accumulated diff of a job
 HIncrBy(ctx, r.formatKey("job",jobHash), login, diff)   (miner.go: processShare->WriteBlock)

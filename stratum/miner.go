@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/XDagger/xdagpool/util"
+	"github.com/XDagger/xdagpool/ws"
 	"github.com/XDagger/xdagpool/xdago/base58"
 )
 
@@ -70,7 +71,7 @@ func (cs *Session) getJob(t *BlockTemplate) *JobReplyData {
 	job.submissions = make(map[string]struct{})
 	cs.pushJob(job)
 	reply := &JobReplyData{Algo: "rx/xdag", JobId: job.id, Blob: blob, Target: cs.endpoint.targetHex,
-		Height:   t.height,
+		// Height:   t.height,
 		SeedHash: hex.EncodeToString(t.seedHash)}
 	return reply
 }
@@ -136,7 +137,7 @@ func (m *Miner) hashrate(estimationWindow time.Duration) float64 {
 
 func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTemplate, nonce string, result string,
 	hashrateExpiration time.Duration) bool {
-	r := s.rpc()
+	// r := s.rpc()
 
 	// 32 bytes (reserved) = 20 bytes (pool owner wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId) + 4 bytes (share nonce)
 	shareBuff := make([]byte, len(t.buffer)*2)
@@ -186,10 +187,11 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 
 		// block
 		if minShare {
-			_, err := r.SubmitBlock(hex.EncodeToString(shareBuff)) //TODO: send pool address + share
+			err := ws.Submit(hex.EncodeToString(shareBuff[:32]),
+				hex.EncodeToString(shareBuff[32:]), t.taskIndex)
 			if err != nil {
-				atomic.AddInt64(&m.rejects, 1)
-				atomic.AddInt64(&r.Rejects, 1)
+				// atomic.AddInt64(&m.rejects, 1)
+				// atomic.AddInt64(&r.Rejects, 1)
 				util.Error.Printf("Block rejected at hash %s: %v", t.jobHash, err)
 				util.BlockLog.Printf("Block rejected at hash %s: %v", t.jobHash, err)
 			}
@@ -201,19 +203,19 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 		// 	util.Error.Printf("Block rejected at height %d: %v", t.height, err)
 		// 	util.BlockLog.Printf("Block rejected at height %d: %v", t.height, err)
 		// } else {
-		blockFastHash := hex.EncodeToString(util.FastHash(shareBuff))
-		now := util.MakeTimestamp()
-		roundShares := atomic.SwapInt64(&s.roundShares, 0)
-		ratio := float64(roundShares) / float64(t.diffInt64)
-		s.blocksMu.Lock()
-		s.blockStats[now] = blockEntry{height: t.height, hash: blockFastHash, variance: ratio}
-		s.blocksMu.Unlock()
-		atomic.AddInt64(&m.accepts, 1)
-		atomic.AddInt64(&r.Accepts, 1)
-		atomic.StoreInt64(&r.LastSubmissionAt, now)
+		// blockFastHash := hex.EncodeToString(util.FastHash(shareBuff))
+		// now := util.MakeTimestamp()
+		// roundShares := atomic.SwapInt64(&s.roundShares, 0)
+		// ratio := float64(roundShares) / float64(t.diffInt64)
+		// s.blocksMu.Lock()
+		// s.blockStats[now] = blockEntry{height: t.height, hash: blockFastHash, variance: ratio}
+		// s.blocksMu.Unlock()
+		// atomic.AddInt64(&m.accepts, 1)
+		// atomic.AddInt64(&r.Accepts, 1)
+		// atomic.StoreInt64(&r.LastSubmissionAt, now)
 
 		exist, err := s.backend.WriteBlock(cs.login, cs.id, share, cs.endpoint.difficulty.Int64(),
-			t.diffInt64, shareU64, t.timestamp, hashrateExpiration, t.jobHash)
+			shareU64, t.timestamp, hashrateExpiration, t.jobHash)
 		if exist {
 			ms := util.MakeTimestamp()
 			ts := ms / 1000
@@ -228,15 +230,15 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 			util.Error.Println("Failed to insert block candidate into backend:", err)
 			util.BlockLog.Println("Failed to insert block candidate into backend:", err)
 		} else {
-			util.Info.Printf("Inserted block %v to backend", t.height)
-			util.BlockLog.Printf("Inserted block %v to backend", t.height)
+			util.Info.Printf("Inserted block %s to backend", t.jobHash)
+			util.BlockLog.Printf("Inserted block %s to backend", t.jobHash)
 		}
 
-		util.Info.Printf("Block %s found at height %d by miner %v.%v@%v with ratio %.4f", blockFastHash[0:6], t.height, cs.login, cs.id, cs.ip, ratio)
-		util.BlockLog.Printf("Block %s found at height %d by miner %v.%v@%v with ratio %.4f", blockFastHash[0:6], t.height, cs.login, cs.id, cs.ip, ratio)
+		util.Info.Printf("Block %s found by miner %v.%v@%v", t.jobHash, cs.login, cs.id, cs.ip)
+		util.BlockLog.Printf("Block %s found by miner %v.%v@%v", t.jobHash, cs.login, cs.id, cs.ip)
 
 		// Immediately refresh current BT and send new jobs
-		s.refreshBlockTemplate(true)
+		// s.refreshBlockTemplate(true)
 		// }
 	} else {
 		// invalid share
@@ -257,7 +259,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	atomic.AddInt64(&m.validShares, 1)
 	m.storeShare(cs.endpoint.config.Difficulty)
 
-	util.Info.Printf("Valid share of %v at difficulty %v[%v] from %v.%v@%v", hashDiff, cs.endpoint.config.Difficulty, t.difficulty, cs.login, cs.id, cs.ip)
-	util.ShareLog.Printf("Valid share of %v at difficulty %v[%v] from %v.%v@%v", hashDiff, cs.endpoint.config.Difficulty, t.difficulty, cs.login, cs.id, cs.ip)
+	util.Info.Printf("Valid share of %v at difficulty %v from %v.%v@%v", hashDiff, cs.endpoint.config.Difficulty, cs.login, cs.id, cs.ip)
+	util.ShareLog.Printf("Valid share of %v at difficulty %v from %v.%v@%v", hashDiff, cs.endpoint.config.Difficulty, cs.login, cs.id, cs.ip)
 	return true
 }

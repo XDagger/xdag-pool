@@ -5,11 +5,14 @@
 	"estimationWindow": "15m",
 	"luckWindow": "24h",
 	"largeLuckWindow": "72h",
-	"blockRefreshInterval": "1s",
 	"hashRateExpiration": "3h",
 	"purgeInterval": "10m",
 	"hashrateWindow": "30m",
 	"hashrateLargeWindow": "3h",
+	"node_name": "example.equal",
+	"node_rpc": "https://mainnet-rpc.xdagj.org",
+	"node_ws": "ws://mainnet-rpc.xdagj.org",
+	"ws_ssl": false,
 	"log": {
 		"logSetLevel": 10
 	},
@@ -46,59 +49,20 @@
 		"password": "",
 		"hideIP": false
 	},
-	"upstreamCheckInterval": "5s",
-	"upstream": [
-		{
-			"name": "Main",
-			"host": "192.168.33.166",
-			"port": 18081,
-			"timeout": "3s"
-		},
-		{
-			"name": "Backup1",
-			"host": "192.168.26.83",
-			"port": 18081,
-			"timeout": "3s"
-		},
-		{
-			"name": "Backup2",
-			"host": "192.168.33.243",
-			"port": 18081,
-			"timeout": "3s"
-		}
-	],
-	"redis": {
-		"enabled": false,
+	"kvrocks": {
 		"endpoint": "127.0.0.1:6379",
 		"poolSize": 10,
 		"database": 0,
 		"passwordEncrypted": "oXyI5OTy+nRTshESi80X8KKSjDiLksuw1mhwRg2z0Ic="
 	},
-	"redisFailover": {
-		"enabled": true,
-		"masterName": "mymaster",
-		"sentinelEndpoints": [
-			"192.168.33.166:26379",
-			"192.168.26.83:26379",
-			"192.168.33.243:26379"
-		],
-		"poolSize": 10,
-		"database": 0,
-		"passwordEncrypted": "oXyI5OTy+nRTshESi80X8KKSjDiLksuw1mhwRg2z0Ic="
-	},
-	"unlocker": {
-		"enabled": true,
+	"payout": {
 		"poolRation": 5.0,
 		"fundRation": 5.0,
 		"rewardRation": 5.0,
 		"directRation": 5.0,
 		"threshold": 3,
 		"paymentInterval": "10m",
-		"keepTxFees": false,
 		"mode": "equal",
-		"paymentRemark": "http://mypool.com",
-		"xdagjHost": "https://mainnet-rpc.xdagj.org",
-		"xdagjPort": 80,
-		"timeout": "10s"
+		"paymentRemark": "http://mypool.com"
 	}
 }

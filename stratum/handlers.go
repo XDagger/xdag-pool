@@ -1,11 +1,14 @@
 package stratum
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/XDagger/xdagpool/payouts"
+	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/util"
 )
 
@@ -139,11 +142,22 @@ func (s *StratumServer) broadcastNewJobs() {
 	util.Info.Printf("Jobs broadcast finished %s", time.Since(start))
 }
 
-func (s *StratumServer) refreshBlockTemplate(bcast bool) {
-	newBlock := s.fetchBlockTemplate()
-	if newBlock && bcast {
+func (s *StratumServer) refreshBlockTemplate(msg json.RawMessage) {
+	newBlock := s.fetchBlockTemplate(msg)
+	if newBlock {
 		s.broadcastNewJobs()
 	}
+}
+
+func (s *StratumServer) processRewards(msg json.RawMessage) {
+	var rewards []pool.XdagjReward
+	err := json.Unmarshal(msg, &rewards)
+	if err == nil {
+		for _, v := range rewards {
+			payouts.ProcessReward(s.config, s.backend, v)
+		}
+	}
+	util.Error.Println("unmarshal rewards error", err)
 }
 
 func extractWorkerId(loginWorkerPair, pass string) (string, string) {

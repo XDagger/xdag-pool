@@ -17,21 +17,19 @@ import (
 	"github.com/XDagger/xdagpool/kvstore"
 
 	"github.com/XDagger/xdagpool/pool"
-	"github.com/XDagger/xdagpool/rpc"
 	"github.com/XDagger/xdagpool/util"
 	. "github.com/XDagger/xdagpool/util"
 )
 
 type StratumServer struct {
-	luckWindow          int64
-	luckLargeWindow     int64
-	roundShares         int64
-	blockStats          map[int64]blockEntry
-	config              *pool.Config
-	miners              MinersMap
-	blockTemplate       atomic.Value
-	upstream            int32
-	upstreams           []*rpc.RPCClient
+	luckWindow      int64
+	luckLargeWindow int64
+	roundShares     int64
+	blockStats      map[int64]blockEntry
+	config          *pool.Config
+	miners          MinersMap
+	blockTemplate   atomic.Value
+	// upWsClient          *ws.Socket
 	timeout             time.Duration
 	estimationWindow    time.Duration
 	hashrateWindow      time.Duration
@@ -87,21 +85,12 @@ const (
 	MaxReqSize = 10 * 1024
 )
 
-func NewStratum(cfg *pool.Config, backend *kvstore.KvClient) *StratumServer {
+func NewStratum(cfg *pool.Config, backend *kvstore.KvClient, msgChan chan pool.Message) *StratumServer {
 	stratum := &StratumServer{config: cfg, backend: backend, blockStats: make(map[int64]blockEntry),
 		maxConcurrency: cfg.Threads}
 
-	stratum.upstreams = make([]*rpc.RPCClient, len(cfg.Upstream))
-	for i, v := range cfg.Upstream {
-		client, err := rpc.NewRPCClient(&v)
-		if err != nil {
-			Error.Fatal(err)
-		} else {
-			stratum.upstreams[i] = client
-			Info.Printf("Upstream: %s => %s", client.Name, client.Url)
-		}
-	}
-	Info.Printf("Default upstream: %s => %s", stratum.rpc().Name, stratum.rpc().Url)
+	// stratum.upWsClient = ws.NewRpcClient(cfg.NodeWs, cfg.WsSsl)
+	// Info.Printf("Upstream ws: %s => %s", cfg.NodeName, cfg.NodeWs)
 
 	stratum.miners = NewMinersMap()
 	stratum.sessions = make(map[*Session]struct{})
@@ -126,34 +115,9 @@ func NewStratum(cfg *pool.Config, backend *kvstore.KvClient) *StratumServer {
 	luckLargeWindow, _ := time.ParseDuration(cfg.LargeLuckWindow)
 	stratum.luckLargeWindow = int64(luckLargeWindow / time.Millisecond)
 
-	refreshIntv, _ := time.ParseDuration(cfg.BlockRefreshInterval)
-	refreshTimer := time.NewTimer(refreshIntv)
-	Info.Printf("Set block refresh every %v", refreshIntv)
-
 	purgeIntv := MustParseDuration(cfg.PurgeInterval)
 	purgeTimer := time.NewTimer(purgeIntv)
 	Info.Printf("Set purge interval to %v", purgeIntv)
-
-	checkIntv, _ := time.ParseDuration(cfg.UpstreamCheckInterval)
-	checkTimer := time.NewTimer(checkIntv)
-	Info.Printf("Set check interval to %v", checkIntv)
-
-	//infoIntv, _ := time.ParseDuration(cfg.UpstreamCheckInterval)
-	//infoTimer := time.NewTimer(infoIntv)
-	//Info.Printf("Set info interval to %v", infoIntv)
-
-	// Init block template
-	go stratum.refreshBlockTemplate(false)
-
-	go func() {
-		for {
-			select {
-			case <-refreshTimer.C:
-				stratum.refreshBlockTemplate(true)
-				refreshTimer.Reset(refreshIntv)
-			}
-		}
-	}()
 
 	// purge stale
 	go func() {
@@ -166,41 +130,15 @@ func NewStratum(cfg *pool.Config, backend *kvstore.KvClient) *StratumServer {
 		}
 	}()
 
-	go func() {
-		for {
-			select {
-			case <-checkTimer.C:
-				stratum.checkUpstreams()
-				checkTimer.Reset(checkIntv)
+	go func(c chan pool.Message) {
+		for m := range c {
+			if m.MsgType == 1 { // task
+				stratum.refreshBlockTemplate(m.MsgContent)
+			} else if m.MsgType == 3 { // rewards
+				stratum.processRewards(m.MsgContent)
 			}
 		}
-	}()
-
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-infoTimer.C:
-	//			poll := func(v *rpc.RPCClient) {
-	//				_, err := v.UpdateInfo()
-	//				if err != nil {
-	//					Error.Printf("Unable to update info on upstream %s: %v", v.Name, err)
-	//				}
-	//			}
-	//			current := stratum.rpc()
-	//			poll(current)
-	//
-	//			// Async rpc call to not block on rpc timeout, ignoring current
-	//			go func() {
-	//				for _, v := range stratum.upstreams {
-	//					if v != current {
-	//						poll(v)
-	//					}
-	//				}
-	//			}()
-	//			infoTimer.Reset(infoIntv)
-	//		}
-	//	}
-	//}()
+	}(msgChan)
 
 	return stratum
 }
@@ -536,53 +474,6 @@ func (s *StratumServer) currentBlockTemplate() *BlockTemplate {
 	return nil
 }
 
-func (s *StratumServer) checkUpstreams() {
-	candidate := int32(0)
-	backup := false
-
-	for i, v := range s.upstreams {
-		ok, err := v.Check(8, s.config.Address)
-		if err != nil {
-			Error.Printf("Upstream %v didn't pass check: %v", v.Name, err)
-		}
-		if ok && !backup {
-			candidate = int32(i)
-			backup = true
-		}
-	}
-
-	if s.upstream != candidate {
-		Info.Printf("Switching to %v upstream", s.upstreams[candidate].Name)
-		atomic.StoreInt32(&s.upstream, candidate)
-	}
-
-	upstreamsAllSick := true
-	for _, v := range s.upstreams {
-		if !v.Sick() {
-			upstreamsAllSick = false
-			break
-		}
-	}
-
-	s.upstreamsStates = append(s.upstreamsStates, upstreamsAllSick)
-	if len(s.upstreamsStates) >= 60 {
-		s.upstreamsStates = s.upstreamsStates[len(s.upstreamsStates)-60 : len(s.upstreamsStates)]
-
-		// sick in the past 5 minutes, log and exit
-		sickStatusAllTrue := true
-		for _, v := range s.upstreamsStates {
-			if !v {
-				sickStatusAllTrue = false
-				break
-			}
-		}
-
-		if sickStatusAllTrue {
-			Error.Fatal("all upstreams status were sick in the latest 5 minutes")
-		}
-	}
-}
-
 func (s *StratumServer) purgeStale() {
 	start := time.Now()
 	total, err := s.backend.FlushStaleStats(s.hashrateWindow, s.hashrateLargeWindow)
@@ -591,9 +482,4 @@ func (s *StratumServer) purgeStale() {
 	} else {
 		Info.Printf("Purged stale stats from backend, %v shares affected, elapsed time %v", total, time.Since(start))
 	}
-}
-
-func (s *StratumServer) rpc() *rpc.RPCClient {
-	i := atomic.LoadInt32(&s.upstream)
-	return s.upstreams[i]
 }

@@ -1,7 +1,8 @@
 package pool
 
+import "encoding/json"
+
 type StorageConfig struct {
-	Enabled           bool   `json:"enabled"`
 	Endpoint          string `json:"endpoint"`
 	PasswordEncrypted string `json:"passwordEncrypted"`
 	Password          string `json:"-"`
@@ -9,47 +10,29 @@ type StorageConfig struct {
 	PoolSize          int    `json:"poolSize"`
 }
 
-type StorageConfigFailover struct {
-	Enabled           bool     `json:"enabled"`
-	MasterName        string   `json:"masterName"`
-	SentinelEndpoints []string `json:"sentinelEndpoints"`
-	PasswordEncrypted string   `json:"passwordEncrypted"`
-	Password          string   `json:"-"`
-	Database          int64    `json:"database"`
-	PoolSize          int      `json:"poolSize"`
-}
-
-type UnlockerConfig struct {
-	Enabled         bool    `json:"enabled"`
+type PayOutConfig struct {
 	PoolRation      float64 `json:"poolRation"`
 	FundRation      float64 `json:"fundRation"`
 	RewardRation    float64 `json:"rewardRation"`
 	DirectRation    float64 `json:"directRation"`
 	PoolFeeAddress  string  `json:"poolFeeAddress"`
-	Donate          bool    `json:"donate"`
 	Threshold       int64   `json:"threshold"`
 	PaymentInterval string  `json:"paymentInterval"`
-	KeepTxFees      bool    `json:"keepTxFees"`
 	Mode            string  `json:"mode"`
 	PaymentRemark   string  `json:"paymentRemark"`
-	DaemonHost      string  `json:"daemonHost"`
-	DaemonPort      int     `json:"daemonPort"`
-	Timeout         string  `json:"timeout"`
 }
 
 type Config struct {
-	AddressEncrypted      string     `json:"addressEncrypted"`
-	Address               string     `json:"-"`
-	Log                   Log        `json:"log"`
-	Stratum               Stratum    `json:"stratum"`
-	StratumTls            StratumTls `json:"stratumTls"`
-	BlockRefreshInterval  string     `json:"blockRefreshInterval"`
-	UpstreamCheckInterval string     `json:"upstreamCheckInterval"`
-	Upstream              []Upstream `json:"upstream"`
-	EstimationWindow      string     `json:"estimationWindow"`
-	LuckWindow            string     `json:"luckWindow"`
-	LargeLuckWindow       string     `json:"largeLuckWindow"`
-	HashRateExpiration    string     `json:"hashRateExpiration"`
+	AddressEncrypted string     `json:"addressEncrypted"`
+	Address          string     `json:"-"`
+	Log              Log        `json:"log"`
+	Stratum          Stratum    `json:"stratum"`
+	StratumTls       StratumTls `json:"stratumTls"`
+	// BlockRefreshInterval string     `json:"blockRefreshInterval"`
+	EstimationWindow   string `json:"estimationWindow"`
+	LuckWindow         string `json:"luckWindow"`
+	LargeLuckWindow    string `json:"largeLuckWindow"`
+	HashRateExpiration string `json:"hashRateExpiration"`
 
 	PurgeInterval       string `json:"purgeInterval"`
 	HashrateWindow      string `json:"hashrateWindow"`
@@ -58,12 +41,15 @@ type Config struct {
 	Threads  int      `json:"threads"`
 	Frontend Frontend `json:"frontend"`
 
-	Coin          string                `json:"coin"`
-	Redis         StorageConfig         `json:"redis"`
-	RedisFailover StorageConfigFailover `json:"redisFailover"`
+	Coin    string        `json:"coin"`
+	KvRocks StorageConfig `json:"kvrocks"`
 
-	NodeRpc       string         `json:"node_rpc"`
-	BlockUnlocker UnlockerConfig `json:"unlocker"`
+	NodeName string `json:"node_name"`
+	NodeRpc  string `json:"node_rpc"`
+	NodeWs   string `json:"node_ws"`
+	WsSsl    bool   `json:"ws_ssl"`
+
+	PayOut PayOutConfig `json:"payout"`
 }
 
 type Stratum struct {
@@ -113,4 +99,18 @@ type XdagjReward struct {
 	Share   string  `json:"share"`
 	Amount  float64 `json:"amount"`
 	Fee     float64 `json:"fee"`
+}
+
+type Message struct {
+	MsgType    int             `json:"msgType"` // 1:task, 2:share, 3:rewards
+	MsgContent json.RawMessage `json:"msgContent"`
+}
+type Task struct {
+	PreHash  string `json:"preHash"`
+	TashSeed string `json:"taskSeed"`
+}
+type XdagjTask struct {
+	Data      Task   `json:"task"`
+	Timestamp uint64 `json:"taskTime"`
+	Index     int    `json:"taskIndex"`
 }

@@ -23,7 +23,7 @@ func ProcessReward(cfg *pool.Config, backend *kvstore.KvClient, reward pool.Xdag
 	ts := ms / 1000
 	login, err := addressFromShare(reward.Share)
 	if err != nil {
-		util.Error.Println("invalid share in xdagj reward")
+		util.Error.Println("invalid share in xdagj reward", err)
 		return
 	}
 
@@ -34,7 +34,7 @@ func ProcessReward(cfg *pool.Config, backend *kvstore.KvClient, reward pool.Xdag
 	}
 	err = backend.SetWinReward(login, reward, ms, ts)
 	if err != nil {
-		util.Error.Println("store win set error")
+		util.Error.Println("store win set error", err)
 		return
 	}
 
@@ -43,31 +43,30 @@ func ProcessReward(cfg *pool.Config, backend *kvstore.KvClient, reward pool.Xdag
 }
 
 func dividend(cfg *pool.Config, backend *kvstore.KvClient, login string, reward pool.XdagjReward, ms, ts int64) {
-	poolFee := reward.Amount * cfg.BlockUnlocker.PoolRation / 100.0     // for pool owner
-	fundFee := reward.Amount * cfg.BlockUnlocker.FundRation / 100.0     //for community fund
-	rewardFee := reward.Amount * cfg.BlockUnlocker.RewardRation / 100.0 // reward to lowest hash finder
-	directFee := reward.Amount * cfg.BlockUnlocker.DirectRation / 100.0 // divided equally to every miner
+	poolFee := reward.Amount * cfg.PayOut.PoolRation / 100.0     // for pool owner
+	fundFee := reward.Amount * cfg.PayOut.FundRation / 100.0     //for community fund
+	rewardFee := reward.Amount * cfg.PayOut.RewardRation / 100.0 // reward to lowest hash finder
+	directFee := reward.Amount * cfg.PayOut.DirectRation / 100.0 // divided equally to every miner
 
 	payFund(backend, CommunityAddress, reward.PreHash,
-		cfg.BlockUnlocker.PaymentRemark, fundFee)
+		cfg.PayOut.PaymentRemark, fundFee)
 
 	divideAmount := reward.Amount - poolFee - fundFee - directFee
-	if cfg.BlockUnlocker.Mode == "solo" {
+	if cfg.PayOut.Mode == "solo" {
 		backend.SetFinderReward(login, reward, divideAmount, ms, ts)
 	} else {
 		backend.SetFinderReward(login, reward, rewardFee, ms, ts)
 	}
 
-	if cfg.BlockUnlocker.Mode == "solo" && cfg.BlockUnlocker.DirectRation > 0 {
+	if cfg.PayOut.Mode == "solo" && cfg.PayOut.DirectRation > 0 {
 		backend.DivideSolo(login, reward, directFee, ms, ts)
 	} else {
-		if cfg.BlockUnlocker.DirectRation > 0 {
+		if cfg.PayOut.DirectRation > 0 {
 			divideAmount = divideAmount - rewardFee
 			backend.DivideEqual(login, reward, directFee, divideAmount, ms, ts)
 		} else {
 			backend.DivideEqual(login, reward, 0, divideAmount, ms, ts)
 		}
-
 	}
 }
 

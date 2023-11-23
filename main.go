@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/mux"
 	"golang.org/x/term"
 
+	"github.com/XDagger/xdagpool/ws"
 	"github.com/XDagger/xdagpool/xdago/base58"
 	"github.com/XDagger/xdagpool/xdago/cryptography"
 	bip "github.com/XDagger/xdagpool/xdago/wallet"
@@ -45,6 +46,7 @@ var (
 
 var cfg pool.Config
 var backend *kvstore.KvClient = nil
+var msgChan chan pool.Message
 
 func startStratum() {
 	if cfg.Threads > 0 {
@@ -56,7 +58,7 @@ func startStratum() {
 		util.Info.Printf("Running with default %v threads", n)
 	}
 
-	s := stratum.NewStratum(&cfg, backend)
+	s := stratum.NewStratum(&cfg, backend, msgChan)
 	if cfg.Frontend.Enabled {
 		go startFrontend(&cfg, s)
 	}
@@ -173,21 +175,21 @@ func decryptPoolConfigure(cfg *pool.Config, passBytes []byte) error {
 		return errors.New("decryptPoolConfigure: ValidateAddress")
 	}
 
-	if cfg.Redis.Enabled {
-		b, err = util.Ae64Decode(cfg.Redis.PasswordEncrypted, passBytes)
-		if err != nil {
-			return err
-		}
-		cfg.Redis.Password = string(b)
+	// if cfg.Redis.Enabled {
+	b, err = util.Ae64Decode(cfg.KvRocks.PasswordEncrypted, passBytes)
+	if err != nil {
+		return err
 	}
+	cfg.KvRocks.Password = string(b)
+	// }
 
-	if cfg.RedisFailover.Enabled {
-		b, err = util.Ae64Decode(cfg.RedisFailover.PasswordEncrypted, passBytes)
-		if err != nil {
-			return err
-		}
-		cfg.RedisFailover.Password = string(b)
-	}
+	// if cfg.RedisFailover.Enabled {
+	// 	b, err = util.Ae64Decode(cfg.RedisFailover.PasswordEncrypted, passBytes)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	cfg.RedisFailover.Password = string(b)
+	// }
 
 	return nil
 }
@@ -206,11 +208,6 @@ func OptionParse() {
 		fmt.Printf("Release Type: %s\n", ReleaseType)
 		os.Exit(0)
 	}
-}
-
-func startBlockUnlocker() {
-	u := payouts.NewBlockUnlocker(&cfg.BlockUnlocker, backend)
-	u.Start()
 }
 
 func main() {
@@ -258,11 +255,7 @@ func main() {
 		util.Error.Fatal("Wallet Account Address and Pool Address in Config File are not equal.")
 	}
 
-	if cfg.Redis.Enabled {
-		backend = kvstore.NewKvClient(&cfg.Redis, cfg.Coin)
-	} else if cfg.RedisFailover.Enabled {
-		backend = kvstore.NewKvFailoverClient(&cfg.RedisFailover, cfg.Coin)
-	}
+	backend = kvstore.NewKvClient(&cfg.KvRocks, cfg.Coin)
 
 	if backend == nil {
 		util.Error.Fatal("Backend is Nil: maybe redis/redisFailover config is invalid")
@@ -281,15 +274,13 @@ func main() {
 		}
 	}()
 
-	if cfg.BlockUnlocker.Enabled {
-		go startBlockUnlocker()
-	}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		payouts.PaymentTask(ctx, &cfg, backend)
 	}()
-
+	msgChan = make(chan pool.Message, 512)
+	ws.NewClient(cfg.NodeWs, cfg.WsSsl, msgChan)
 	//startNewrelic()
 	startStratum()
 
@@ -314,5 +305,3 @@ func connectBipWallet(password string) (bool, string) {
 	}
 	return false, ""
 }
-
-func getBipAddress()

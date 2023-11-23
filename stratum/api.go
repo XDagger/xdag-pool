@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/XDagger/xdagpool/rpc"
 	"github.com/XDagger/xdagpool/util"
+	"github.com/XDagger/xdagpool/ws"
 )
 
 func (s *StratumServer) StatsIndex(w http.ResponseWriter, r *http.Request) {
@@ -25,43 +25,34 @@ func (s *StratumServer) StatsIndex(w http.ResponseWriter, r *http.Request) {
 		"now":         util.MakeTimestamp(),
 	}
 
-	var upstreams []interface{}
-	current := atomic.LoadInt32(&s.upstream)
-
-	for i, u := range s.upstreams {
-		upstream := convertUpstream(u)
-		upstream["current"] = current == int32(i)
-		upstreams = append(upstreams, upstream)
-	}
-	stats["upstreams"] = upstreams
-	stats["current"] = convertUpstream(s.rpc())
+	stats["upstream"] = ws.Client.Url
 	stats["luck"] = s.getLuckStats()
 	stats["blocks"] = s.getBlocksStats()
 
 	if t := s.currentBlockTemplate(); t != nil {
-		stats["height"] = t.height
-		stats["diff"] = t.diffInt64
-		roundShares := atomic.LoadInt64(&s.roundShares)
-		stats["variance"] = float64(roundShares) / float64(t.diffInt64)
+		// stats["height"] = t.height
+		// stats["diff"] = t.diffInt64
+		// roundShares := atomic.LoadInt64(&s.roundShares)
+		// stats["variance"] = float64(roundShares) / float64(t.diffInt64)
 		stats["prevHash"] = t.jobHash[0:8]
 		stats["template"] = true
 	}
 	_ = json.NewEncoder(w).Encode(stats)
 }
 
-func convertUpstream(u *rpc.RPCClient) map[string]interface{} {
-	upstream := map[string]interface{}{
-		"name":             u.Name,
-		"url":              u.Url.String(),
-		"sick":             u.Sick(),
-		"accepts":          atomic.LoadInt64(&u.Accepts),
-		"rejects":          atomic.LoadInt64(&u.Rejects),
-		"lastSubmissionAt": atomic.LoadInt64(&u.LastSubmissionAt),
-		"failsCount":       atomic.LoadInt64(&u.FailsCount),
-		//"info":             u.Info(),
-	}
-	return upstream
-}
+// func convertUpstream(u *rpc.RPCClient) map[string]interface{} {
+// 	upstream := map[string]interface{}{
+// 		"name":             u.Name,
+// 		"url":              u.Url.String(),
+// 		"sick":             u.Sick(),
+// 		"accepts":          atomic.LoadInt64(&u.Accepts),
+// 		"rejects":          atomic.LoadInt64(&u.Rejects),
+// 		"lastSubmissionAt": atomic.LoadInt64(&u.LastSubmissionAt),
+// 		"failsCount":       atomic.LoadInt64(&u.FailsCount),
+// 		//"info":             u.Info(),
+// 	}
+// 	return upstream
+// }
 
 func (s *StratumServer) collectMinersStats() (float64, float64, int, []interface{}) {
 	now := util.MakeTimestamp()
