@@ -8,8 +8,8 @@ High performance xdag mining stratum with Web-interface written in Golang.
 * Rigs availability monitoring
 * Keep track of accepts, rejects, blocks stats
 * Easy detection of sick rigs
-* Daemon failover list
 * Concurrent shares processing
+* config encrypted by pool password
 * Beautiful Web-interface
 
 ![](screenshot.png)
@@ -107,37 +107,24 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 
 ```javascript
 {
-  // Address for block rewards
-  "address": "YOUR-ADDRESS-NOT-EXCHANGE",
-  // Don't validate address
-  "bypassAddressValidation": true,
-  // Don't validate shares
-  "bypassShareValidation": true,
-
-  "threads": 2,
+  // Pool Address for rewards
+  // AES: CBC, Key Size: 128bits, IV and Secret Key: 16 characters long( add '*' if length not enough)
+  "addressEncrypted": "YOUR-ADDRESS-ENCRYPTED",
+  "threads": 4,
 
   "estimationWindow": "15m",
   "luckWindow": "24h",
   "largeLuckWindow": "72h",
 
-  // Interval to poll daemon for new jobs
-  "blockRefreshInterval": "1s",
-
   "stratum": {
     // Socket timeout
-    "timeout": "15m",
+    "timeout": "2m",
 
     "listen": [
       {
         "host": "0.0.0.0",
         "port": 1111,
         "diff": 5000,
-        "maxConn": 32768
-      },
-      {
-        "host": "0.0.0.0",
-        "port": 3333,
-        "diff": 10000,
         "maxConn": 32768
       }
     ]
@@ -151,31 +138,29 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
     "hideIP": false
   },
 
-  "upstreamCheckInterval": "5s",
+  "kvrocks": {
+		"endpoint": "127.0.0.1:6379",
+		"poolSize": 10,
+		"database": 0,
+		"passwordEncrypted": "oXyI5OTy+nRTshESi80X8KKSjDiLksuw1mhwRg2z0Ic="
+	},
 
-  "upstream": [
-    {
-      "name": "Main",
-      "host": "127.0.0.1",
-      "port": 18081,
-      "timeout": "10s"
-    }
-  ]
-}
+	"payout": {
+		"poolRation": 5.0,
+		"fundRation": 5.0,
+		"rewardRation": 5.0,
+		"directRation": 5.0,
+    // threshhold to pay miner
+		"threshold": 3,
+		"paymentInterval": "10m",
+    // solo or equal
+		"mode": "equal",
+		"paymentRemark": "http://mypool.com"
+	}
+
+ }
 ```
 
-You must use `anything.WorkerID` as username in your miner. Either disable address validation or use `<address>.WorkerID` as username. If there is no workerID specified your rig stats will be merged under `0` worker. If mining software contains dev fee rounds its stats will usually appear under `0` worker. This stratum acts like your own pool, the only exception is that you will get rewarded only after block found, shares only used for stats.
+You must use ``<address>.WorkerID`` as username in your miner. If there is no workerID specified your rig stats will be merged under `0` worker. 
 
-<!-- ### Donations
-
-**XMR**: `47v4BWeUPFrM9YkYRYk2pkS9CubAPEc7BJjNjg4FvF66Y2oVrTAaBjDZhmFzAXgqCNRvBH2gupQ2gNag2FkP983ZMptvUWG`
-
-![](https://cdn.pbrd.co/images/GP5tI1D.png)
-
-Highly appreciated.
-
-### License
-
-Released under the GNU General Public License v2.
-
-http://www.gnu.org/licenses/gpl-2.0.html -->
+Copy your wallet data folder xdagj_wallet to pool path.

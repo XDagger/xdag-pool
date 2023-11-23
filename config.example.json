@@ -1,6 +1,6 @@
 {
 	"addressEncrypted": "xePkFW8E5OhMuFg/FyQQqCFs2awuArs/QGEAyJcZ8X4mBV6FM+k1vER2WW6lMSUd1cP/ggTXR8j+43qVa+bNijZMdZyrohoT/7rNUj/toDFGVxzDTDtrRvVs9LbRGtIx",
-	"threads": 16,
+	"threads": 4,
 	"coin": "xdag",
 	"estimationWindow": "15m",
 	"luckWindow": "24h",
