@@ -1,5 +1,5 @@
 {
-	"addressEncrypted": "xePkFW8E5OhMuFg/FyQQqCFs2awuArs/QGEAyJcZ8X4mBV6FM+k1vER2WW6lMSUd1cP/ggTXR8j+43qVa+bNijZMdZyrohoT/7rNUj/toDFGVxzDTDtrRvVs9LbRGtIx",
+	"addressEncrypted": "G6LLHMvWi6HiysT+PuCWXhuaTWOxbHlEocNf5ilWAy+e7KsjAGPVOu1PBgIxxeFD",
 	"threads": 4,
 	"coin": "xdag",
 	"estimationWindow": "15m",
@@ -53,7 +53,7 @@
 		"endpoint": "127.0.0.1:6379",
 		"poolSize": 10,
 		"database": 0,
-		"passwordEncrypted": "oXyI5OTy+nRTshESi80X8KKSjDiLksuw1mhwRg2z0Ic="
+		"passwordEncrypted": "MbRmWtAs7GA2E1B6ioBSoQ=="
 	},
 	"payout": {
 		"poolRation": 5.0,

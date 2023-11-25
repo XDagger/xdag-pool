@@ -25,5 +25,7 @@ mainnet.json
 
 xdagpool
 xdagpool.exe
-
+*.log
 *.exe
+
+xdagj_wallet.bin

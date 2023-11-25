@@ -107,9 +107,9 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 
 ```javascript
 {
-  // Pool Address for rewards
+  // Pool Address for rewards, pool key: 12345678
   // AES: CBC, Key Size: 128bits, IV and Secret Key: 16 characters long( add '*' if length not enough)
-  "addressEncrypted": "YOUR-ADDRESS-ENCRYPTED",
+  "addressEncrypted": "G6LLHMvWi6HiysT+PuCWXhuaTWOxbHlEocNf5ilWAy+e7KsjAGPVOu1PBgIxxeFD",
   "threads": 4,
 
   "estimationWindow": "15m",
@@ -142,7 +142,8 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 		"endpoint": "127.0.0.1:6379",
 		"poolSize": 10,
 		"database": 0,
-		"passwordEncrypted": "oXyI5OTy+nRTshESi80X8KKSjDiLksuw1mhwRg2z0Ic="
+    //123456
+		"passwordEncrypted": "MbRmWtAs7GA2E1B6ioBSoQ=="
 	},
 
 	"payout": {

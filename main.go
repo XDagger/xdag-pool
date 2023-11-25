@@ -122,7 +122,7 @@ func readConfig(cfg *pool.Config) {
 }
 
 func readSecurityPass() ([]byte, error) {
-	fmt.Printf("Enter Security Password: ")
+	fmt.Printf("Enter Security Password: \n")
 	var fd int
 	if term.IsTerminal(int(syscall.Stdin)) {
 		fd = int(syscall.Stdin)
@@ -143,7 +143,7 @@ func readSecurityPass() ([]byte, error) {
 }
 
 func readWalletPass() ([]byte, error) {
-	fmt.Printf("Enter Wallet Password: ")
+	fmt.Printf("Enter Wallet Password: \n")
 	var fd int
 	if term.IsTerminal(int(syscall.Stdin)) {
 		fd = int(syscall.Stdin)
@@ -274,15 +274,16 @@ func main() {
 		}
 	}()
 
+	msgChan = make(chan pool.Message, 512)
+	ws.NewClient(cfg.NodeWs, cfg.WsSsl, msgChan)
+	//startNewrelic()
+	startStratum()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		payouts.PaymentTask(ctx, &cfg, backend)
 	}()
-	msgChan = make(chan pool.Message, 512)
-	ws.NewClient(cfg.NodeWs, cfg.WsSsl, msgChan)
-	//startNewrelic()
-	startStratum()
 
 	wg.Wait()
 	fmt.Println("Stratum server shutdown.")

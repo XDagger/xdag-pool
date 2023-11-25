@@ -28,7 +28,7 @@ func NewClient(url string, ssl bool, msgChan chan pool.Message) *Socket {
 	Client.OnConnectError = func(err error, socket Socket) {
 		util.Error.Println("Recieved connect error ", err)
 		go func() {
-			time.After(1000 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 			Client.Connect() //reconnection
 		}()
 	}

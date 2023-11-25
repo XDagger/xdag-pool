@@ -3,8 +3,8 @@
 xdagj -> pool
 task:
 {
-msgType: 1,
-msgContent: {
+"msgType": 1,
+"msgContent": {
         task": {
             "preHash": "10c19a83f28f1f39220782e45ee3e67c24ae5029cb3f941d4e53a1c24c3143e0",
             "taskSeed": "4405f2f647119fd54273dfdac7091b2919030b33eaa7042296b3228da6c977a5"
@@ -17,8 +17,8 @@ msgContent: {
 pool -> xdagj
 share:
 {
-msgType: 2,
-msgContent: 
+"msgType": 2,
+"msgContent": 
     {
         "share": "46a2a0fe035c413d92be9c79a11cfc3695780f65c103c4321f64eef6a461c43e",
         "hash": "4405f2f647119fd54273dfdac7091b2919030b33eaa7042296b3228da6c977a5",
@@ -29,8 +29,8 @@ msgContent:
 xdagj -> pool
 reward:
 {
-msgType: 3,
-msgContent: [
+"msgType": 3,
+"msgContent": [
         {
             "txBlock": "639183aae1bf4c9a35884cb46b09cad9175f04efd7684e7262a0ac1c2f0b4e3f"
             "preHash": "10c19a83f28f1f39220782e45ee3e67c24ae5029cb3f941d4e53a1c24c3143e0",
