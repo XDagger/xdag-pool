@@ -8,9 +8,9 @@ import (
 type shares struct {
 	lastLock sync.RWMutex
 	curLock  sync.RWMutex
-	set      [2]*map[string]struct{}
-	Last     *map[string]struct{}
-	Current  *map[string]struct{}
+	set      [2]map[string]struct{}
+	Last     map[string]struct{}
+	Current  map[string]struct{}
 	step     uint64
 }
 
@@ -18,7 +18,7 @@ var MinedShares *shares
 
 func NewMinedShares() {
 	MinedShares = &shares{}
-	MinedShares.set[0] = new(map[string]struct{})
+	MinedShares.set[0] = make(map[string]struct{})
 	MinedShares.Current = MinedShares.set[0]
 
 	go func() {
@@ -39,7 +39,7 @@ func (m *shares) Next() {
 
 	m.step += 1
 	n = m.step % 2
-	m.set[n] = new(map[string]struct{})
+	m.set[n] = make(map[string]struct{})
 	m.Current = m.set[n]
 }
 
@@ -58,15 +58,15 @@ func (m *shares) ShareExist(key string) bool {
 	m.lastLock.RLock()
 	defer m.lastLock.RUnlock()
 
-	_, ok1 := (*m.Current)[key]
+	_, ok1 := m.Current[key]
 
 	var ok2 bool
 	if m.Last != nil {
-		_, ok2 = (*m.Last)[key]
+		_, ok2 = m.Last[key]
 	}
 
 	if !ok1 && !ok2 {
-		(*m.Current)[key] = struct{}{}
+		m.Current[key] = struct{}{}
 	}
 
 	return ok1 || ok2

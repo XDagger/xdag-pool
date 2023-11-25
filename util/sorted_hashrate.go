@@ -27,7 +27,7 @@ var HashrateRank *SortedHashrate
 
 // interval: rank refresh interval (minutes)
 func NewHashrateRank(interval int) {
-	HashrateRank := &SortedHashrate{}
+	HashrateRank = &SortedHashrate{}
 	HashrateRank.set[0] = sortedset.New()
 	HashrateRank.Current = HashrateRank.set[0]
 	HashrateRank.interval = interval

@@ -94,7 +94,7 @@ func Submit(jobHash, share string, taskIndex int) error {
 			MsgContent: data,
 		}
 		wsData, _ := json.Marshal(msg)
-		Client.SendBinary(wsData)
+		Client.SendText(string(wsData))
 		return nil
 	}
 	return errors.New("ws disconnected")

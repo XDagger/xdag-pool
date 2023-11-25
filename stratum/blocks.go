@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/XDagger/xdagpool/pool"
+	"github.com/XDagger/xdagpool/randomx"
 	"github.com/XDagger/xdagpool/util"
 	"github.com/XDagger/xdagpool/xdago/base58"
 )
@@ -74,6 +75,10 @@ func (s *StratumServer) fetchBlockTemplate(msg json.RawMessage) bool {
 	}
 	newTemplate.seedHash, _ = hex.DecodeString(reply.Data.TashSeed)
 	newTemplate.buffer, _ = hex.DecodeString(reply.Data.PreHash)
+
+	if t == nil || reply.Data.TashSeed != hex.EncodeToString(newTemplate.seedHash) {
+		randomx.Rx.NewSeed(newTemplate.seedHash)
+	}
 	// newTemplate.nextSeedHash, _ = hex.DecodeString(reply.NextSeedHash)
 
 	// // set blockReward and txTotalFee

@@ -273,7 +273,8 @@ func main() {
 			util.Error.Println(string(debug.Stack()))
 		}
 	}()
-
+	util.NewMinedShares()
+	util.NewHashrateRank(15)
 	msgChan = make(chan pool.Message, 512)
 	ws.NewClient(cfg.NodeWs, cfg.WsSsl, msgChan)
 	//startNewrelic()
