@@ -78,7 +78,7 @@ func (s *StratumServer) fetchBlockTemplate(msg json.RawMessage) bool {
 	newTemplate.seedHash, _ = hex.DecodeString(reply.Data.TashSeed)
 	newTemplate.buffer, _ = hex.DecodeString(reply.Data.PreHash)
 
-	if t == nil || reply.Data.TashSeed != hex.EncodeToString(newTemplate.seedHash) {
+	if t == nil || reply.Data.TashSeed != hex.EncodeToString(t.seedHash) {
 		randomx.Rx.NewSeed(newTemplate.seedHash)
 	}
 	// newTemplate.nextSeedHash, _ = hex.DecodeString(reply.NextSeedHash)
