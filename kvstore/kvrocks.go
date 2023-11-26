@@ -122,6 +122,13 @@ func (r *KvClient) SetMinerReward(login, txHash, jobHash string, reward float64,
 	return err
 }
 
+func (r *KvClient) AddWaiting(jobHash string) {
+	_, err := r.client.SAdd(ctx, "waiting", jobHash).Result()
+	if err != nil {
+		util.Error.Println("add job waiting  set error", jobHash, err)
+	}
+}
+
 func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts int64) error {
 	res, err := r.client.SMove(ctx, "waiting", "win", reward.PreHash).Result()
 	if err != nil {
