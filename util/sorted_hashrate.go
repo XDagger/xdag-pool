@@ -56,7 +56,14 @@ func (s *SortedHashrate) Next() {
 	n = s.step % 2
 	s.set[n] = sortedset.New()
 	s.Current = s.set[n]
-	s.totalHashrate = float64(s.Last.PopMax().Score()) / float64(s.interval)
+
+	total := s.Last.PopMax()
+	if total == nil {
+		s.totalHashrate = 0
+	} else {
+		s.totalHashrate = float64(total.Score()) / float64(s.interval)
+	}
+
 }
 
 // accumulate share diff for miners

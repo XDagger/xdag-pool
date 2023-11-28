@@ -3,6 +3,7 @@ package stratum
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -182,6 +183,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	share := hex.EncodeToString(shareBuff[len(t.buffer):])
 
 	if block {
+		fmt.Println("rxhash:", util.GetRxHashStr(hashBytes))
 		shareU64 := binary.LittleEndian.Uint64(hashBytes[24:32]) // share hash high 8 bytes to uint64 used to compare hash
 		minShare := s.backend.IsMinShare(t.jobHash, cs.login, share, shareU64)
 

@@ -123,14 +123,14 @@ func (r *KvClient) SetMinerReward(login, txHash, jobHash string, reward float64,
 }
 
 func (r *KvClient) AddWaiting(jobHash string) {
-	_, err := r.client.SAdd(ctx, "waiting", jobHash).Result()
+	_, err := r.client.SAdd(ctx, r.formatKey("waiting"), jobHash).Result()
 	if err != nil {
 		util.Error.Println("add job waiting  set error", jobHash, err)
 	}
 }
 
 func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts int64) error {
-	res, err := r.client.SMove(ctx, "waiting", "win", reward.PreHash).Result()
+	res, err := r.client.SMove(ctx, r.formatKey("waiting"), r.formatKey("win"), reward.PreHash).Result()
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts in
 }
 
 func (r *KvClient) SetLostReward(login string, reward pool.XdagjReward, ms, ts int64) {
-	_, err := r.client.SMove(ctx, "waiting", "lost", reward.PreHash).Result()
+	_, err := r.client.SMove(ctx, r.formatKey("waiting"), r.formatKey("lost"), reward.PreHash).Result()
 	if err != nil {
 		util.Error.Println("store lost set error", reward.PreHash, err)
 	}
@@ -230,22 +230,21 @@ func (r *KvClient) FlushStaleStats(window, largeWindow time.Duration) (int64, er
 // get min share rxhash  (high 8 bytes of rxhash as uint64) of a job
 func (r *KvClient) IsMinShare(jobHash, login, share string, shareU64 uint64) bool {
 
-	tx := r.client.TxPipeline()
-	tx.ZAdd(ctx, r.formatKey("mini", jobHash), redis.Z{Score: float64(shareU64), Member: login})
-	tx.ZRangeWithScores(ctx, r.formatKey("mini", jobHash), 0, 0)
-	tx.ZRemRangeByRank(ctx, r.formatKey("mini", jobHash), 1, -1) // delete bigger hash, remain min hash and its miner address
-	cmds, err := tx.Exec(ctx)
+	z, err := r.client.ZRangeWithScores(ctx, r.formatKey("mini", jobHash), 0, 0).Result()
 	if err != nil {
 		util.Error.Printf("Get %s min share failed %v", jobHash, err)
-		util.BlockLog.Printf("Get %s min share failed %v", jobHash, err)
 		return false
 	}
-	z, _ := cmds[1].(*redis.ZSliceCmd).Result()
-	if z[0].Score == float64(shareU64) { // TODO: float64 equality estimation
-		_, err := r.client.SAdd(ctx, r.formatKey("submit", jobHash), share).Result() //store submitted share
+	if len(z) == 0 || uint64(z[0].Score) > shareU64 {
+		tx := r.client.TxPipeline()
+		tx.SAdd(ctx, r.formatKey("submit", jobHash), share) //store submitted share
+		tx.ZAdd(ctx, r.formatKey("mini", jobHash), redis.Z{Score: float64(shareU64), Member: login})
+		_, err := tx.Exec(ctx)
 		if err != nil {
-			util.Error.Println("store submitted share error", err)
+			util.Error.Println("store submitted min share error", err)
 		}
+		r.client.ZRemRangeByRank(ctx, r.formatKey("mini", jobHash), 1, -1).Result() // delete bigger hash, remain min hash and its miner address
+
 		return true
 	}
 	return false
