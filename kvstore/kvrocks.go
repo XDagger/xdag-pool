@@ -91,7 +91,7 @@ func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint
 	// tx.Rename(ctx, r.formatKey("shares", "roundCurrent"), r.formatRound(int64(height), params[0]))
 	// tx.HGetAll(ctx, r.formatRound(int64(height), params[0]))
 	tx.HIncrBy(ctx, r.formatKey("pool", "diff"), jobHash, diff) // accumulate pool diff of the job
-	tx.HIncrBy(ctx, r.formatKey(jobHash), login, diff)          // accumulate miners diff of the job (identified by job hash)
+	tx.HIncrBy(ctx, r.formatKey("job", jobHash), login, diff)   // accumulate miners diff of the job (identified by job hash)
 
 	// cmds, err := tx.Exec(ctx)
 	_, err := tx.Exec(ctx)
@@ -263,13 +263,13 @@ func (r *KvClient) IsPoolShare(jobHash, share string) bool {
 func (r *KvClient) GetMinersToPay(threshold int64) map[string]int64 {
 	miners := make(map[string]int64)
 	thresholdInt := threshold * 1e9
-	iter := r.client.Scan(ctx, 0, "account*", 0).Iterator()
+	iter := r.client.Scan(ctx, 0, r.formatKey("account*"), 0).Iterator()
 	for iter.Next(ctx) {
 		address := iter.Val()
 		unpaid, err := r.client.HGet(ctx, iter.Val(), "unpaid").Int64()
 		if err == nil {
 			if unpaid > thresholdInt {
-				miners[address] = unpaid
+				miners[address[13:]] = unpaid
 			}
 		} else {
 			util.Error.Println("iter miner unpaid error", address, err)
@@ -287,9 +287,12 @@ func (r *KvClient) GetMinersToPay(threshold int64) map[string]int64 {
 func (r *KvClient) GetProportion(jobHash string) map[string]float64 {
 	miners := make(map[string]float64)
 	poolDiff, _ := r.client.HGet(ctx, r.formatKey("pool", "diff"), jobHash).Int64()
-	iter := r.client.Scan(ctx, 0, r.formatKey("job", jobHash), 0).Iterator()
-	for iter.Next(ctx) {
-		address := iter.Val()
+	fields, err := r.client.HKeys(ctx, r.formatKey("job", jobHash)).Result()
+	if err != nil {
+		util.Error.Println("get miners diff error", err)
+		return nil
+	}
+	for _, address := range fields {
 		diff, _ := r.client.HGet(ctx, r.formatKey("job", jobHash), address).Int64()
 		miners[address] = float64(diff) / float64(poolDiff)
 	}
@@ -317,7 +320,7 @@ func (r *KvClient) GetMinerName(jobHash string) []string {
 func (r *KvClient) SetFinderReward(login string, reward pool.XdagjReward, fee float64, ms, ts int64) {
 	// minimum hash finder
 	raw, err := r.client.ZRange(ctx, r.formatKey("mini", reward.PreHash), 0, 0).Result()
-	if err == nil {
+	if err != nil {
 		util.Error.Println("get lowest hash finder by job error", reward.PreHash, err)
 		return
 	}
@@ -326,7 +329,7 @@ func (r *KvClient) SetFinderReward(login string, reward pool.XdagjReward, fee fl
 		return
 	}
 	err = r.SetMinerReward(raw[0], reward.TxBlock, reward.PreHash, fee, ms, ts)
-	if err == nil {
+	if err != nil {
 		util.Error.Println("store hash finder reward error", reward.PreHash, err)
 		return
 	}
@@ -362,7 +365,7 @@ func (r *KvClient) DivideEqual(login string, reward pool.XdagjReward, fee, amoun
 	for miner, ratio := range miners {
 		part := ratio*amount + directPerMiner
 		err := r.SetMinerReward(miner, reward.TxBlock, reward.PreHash, part, ms, ts)
-		if err == nil {
+		if err != nil {
 			util.Error.Println("store equal direct reward error", reward.PreHash, miner, part, err)
 			continue
 		}
@@ -384,7 +387,7 @@ func join(args ...interface{}) string {
 		case uint64:
 			s[i] = strconv.FormatUint(x, 10)
 		case float64:
-			s[i] = strconv.FormatFloat(x, 'f', 0, 64)
+			s[i] = strconv.FormatFloat(x, 'f', 9, 64)
 		case bool:
 			if x {
 				s[i] = "1"

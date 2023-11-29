@@ -156,8 +156,10 @@ func (s *StratumServer) processRewards(msg json.RawMessage) {
 		for _, v := range rewards {
 			payouts.ProcessReward(s.config, s.backend, v)
 		}
+	} else {
+		util.Error.Println("unmarshal rewards error", err)
 	}
-	util.Error.Println("unmarshal rewards error", err)
+
 }
 
 func extractWorkerId(loginWorkerPair, pass string) (string, string) {

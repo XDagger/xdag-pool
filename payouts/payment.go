@@ -72,10 +72,13 @@ func payFund(backend *kvstore.KvClient, fund, jobHash, remark string, amount flo
 func transfer2miner(miner, remark string, amount float64) (txHash string, err error) {
 	txHash, err = TransferRpc(amount, Cfg.Address, miner, remark, BipKey)
 	return
+	// fmt.Println(amount, Cfg.Address, miner, remark)
+	// return getUuid(), nil
+
 }
 
 // uuid as unique remark for a transfer transaction
-// func remarkUuid() string {
+// func getUuid() string {
 // 	uuid := uuid.New().String()
 // 	return strings.Replace(uuid, "-", "", -1)
 // }

@@ -275,16 +275,16 @@ func main() {
 	}()
 	util.NewMinedShares()
 	util.NewHashrateRank(15)
-	msgChan = make(chan pool.Message, 512)
-	ws.NewClient(cfg.NodeWs, cfg.WsSsl, msgChan)
-	//startNewrelic()
-	startStratum()
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		payouts.PaymentTask(ctx, &cfg, backend)
 	}()
+
+	msgChan = make(chan pool.Message, 512)
+	ws.NewClient(cfg.NodeWs, cfg.WsSsl, msgChan)
+	//startNewrelic()
+	startStratum()
 
 	wg.Wait()
 	fmt.Println("Stratum server shutdown.")
