@@ -24,7 +24,7 @@ import (
 	"github.com/buger/jsonparser"
 )
 
-var Cfg pool.Config
+var Cfg *pool.Config
 
 func xdagjRpc(method string, params string) (string, error) {
 	url := Cfg.NodeRpc

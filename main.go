@@ -246,12 +246,12 @@ func main() {
 		util.Error.Fatal("Read Wallet Password error: ", err.Error())
 	}
 
-	hasWallet, bigAddress := connectBipWallet(string(walletPass[:]))
+	hasWallet, bipAddress := connectBipWallet(string(walletPass[:]))
 	if !hasWallet {
 		util.Error.Fatal("Read Wallet files error")
 	}
 
-	if bigAddress != cfg.Address {
+	if bipAddress != cfg.Address {
 		util.Error.Fatal("Wallet Account Address and Pool Address in Config File are not equal.")
 	}
 
@@ -275,6 +275,7 @@ func main() {
 	}()
 	util.NewMinedShares()
 	util.NewHashrateRank(15)
+	payouts.Cfg = &cfg
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
