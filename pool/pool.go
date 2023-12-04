@@ -92,11 +92,13 @@ type Log struct {
 
 // ws reward message from xdaj
 type XdagjReward struct {
-	TxBlock string  `json:"txBlock"`
-	PreHash string  `json:"preHash"`
-	Share   string  `json:"share"`
-	Amount  float64 `json:"amount"`
-	Fee     float64 `json:"fee"`
+	TxBlock     string  `json:"txBlock"`
+	PreHash     string  `json:"preHash"`
+	Share       string  `json:"share"`
+	Amount      float64 `json:"amount"`
+	Fee         float64 `json:"fee"`
+	DonateBlock string  `json:"donateBlock"`
+	Donate      float64 `json:"donate"`
 }
 
 type Message struct {

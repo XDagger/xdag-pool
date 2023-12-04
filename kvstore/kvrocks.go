@@ -142,6 +142,8 @@ func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts in
 	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "unpaid", int64(reward.Amount*1e9))
 	tx.ZAdd(ctx, r.formatKey("pool", "rewards"), redis.Z{Score: float64(ts),
 		Member: join(reward.Amount, reward.Fee, ms, reward.TxBlock, reward.PreHash, login, reward.Share)})
+	tx.ZAdd(ctx, r.formatKey("pool", "donate"), redis.Z{Score: float64(ts),
+		Member: join(reward.Donate, ms, reward.PreHash, reward.DonateBlock)}).Result()
 	_, err = tx.Exec(ctx)
 	return err
 }
@@ -167,14 +169,14 @@ func (r *KvClient) SetPayment(login, txHash, remark string, payment float64, ms,
 	return err
 }
 
-func (r *KvClient) SetFund(fund, txHash, jobHash, remark string, payment float64, ms, ts int64) error {
-	_, err := r.client.ZAdd(ctx, r.formatKey("donate", fund), redis.Z{Score: float64(ts),
-		Member: join(payment, ms, txHash, jobHash, remark)}).Result()
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// func (r *KvClient) SetFund(fund, txHash, jobHash, remark string, payment float64, ms, ts int64) error {
+// 	_, err := r.client.ZAdd(ctx, r.formatKey("donate", fund), redis.Z{Score: float64(ts),
+// 		Member: join(payment, ms, txHash, jobHash, remark)}).Result()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // WARNING: Must run it periodically to flush out of window hashrate entries
 func (r *KvClient) FlushStaleStats(window, largeWindow time.Duration) (int64, error) {
