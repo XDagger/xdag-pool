@@ -44,14 +44,10 @@ func ProcessReward(cfg *pool.Config, backend *kvstore.KvClient, reward pool.Xdag
 
 func dividend(cfg *pool.Config, backend *kvstore.KvClient, login string, reward pool.XdagjReward, ms, ts int64) {
 	poolFee := reward.Amount * cfg.PayOut.PoolRation / 100.0     // for pool owner
-	fundFee := reward.Amount * cfg.PayOut.FundRation / 100.0     //for community fund
 	rewardFee := reward.Amount * cfg.PayOut.RewardRation / 100.0 // reward to lowest hash finder
 	directFee := reward.Amount * cfg.PayOut.DirectRation / 100.0 // divided equally to every miner
 
-	payFund(backend, CommunityAddress, reward.PreHash,
-		cfg.PayOut.PaymentRemark, fundFee)
-
-	divideAmount := reward.Amount - poolFee - fundFee - directFee
+	divideAmount := reward.Amount - poolFee - directFee
 	if cfg.PayOut.Mode == "solo" {
 		backend.SetFinderReward(login, reward, divideAmount, ms, ts)
 	} else {

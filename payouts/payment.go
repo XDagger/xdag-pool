@@ -55,19 +55,19 @@ func payMiner(backend *kvstore.KvClient, miner, remark string, amount float64) {
 	}
 }
 
-func payFund(backend *kvstore.KvClient, fund, jobHash, remark string, amount float64) {
-	ms := util.MakeTimestamp()
-	ts := ms / 1000
-	txHash, err := transfer2miner(fund, remark, amount)
-	if err != nil {
-		util.Error.Println("transfer donate to fund error", fund, amount, err)
-		return
-	}
-	err = backend.SetFund(fund, txHash, jobHash, remark, amount, ms, ts)
-	if err != nil {
-		util.Error.Println("kv store set donate error", fund, txHash, amount, err)
-	}
-}
+// func payFund(backend *kvstore.KvClient, fund, jobHash, remark string, amount float64) {
+// 	ms := util.MakeTimestamp()
+// 	ts := ms / 1000
+// 	txHash, err := transfer2miner(fund, remark, amount)
+// 	if err != nil {
+// 		util.Error.Println("transfer donate to fund error", fund, amount, err)
+// 		return
+// 	}
+// 	err = backend.SetFund(fund, txHash, jobHash, remark, amount, ms, ts)
+// 	if err != nil {
+// 		util.Error.Println("kv store set donate error", fund, txHash, amount, err)
+// 	}
+// }
 
 func transfer2miner(miner, remark string, amount float64) (txHash string, err error) {
 	txHash, err = TransferRpc(amount, Cfg.Address, miner, remark, BipKey)

@@ -12,7 +12,6 @@ type StorageConfig struct {
 
 type PayOutConfig struct {
 	PoolRation      float64 `json:"poolRation"`
-	FundRation      float64 `json:"fundRation"`
 	RewardRation    float64 `json:"rewardRation"`
 	DirectRation    float64 `json:"directRation"`
 	PoolFeeAddress  string  `json:"poolFeeAddress"`
