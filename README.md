@@ -124,7 +124,7 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
       {
         "host": "0.0.0.0",
         "port": 1111,
-        "diff": 5000,
+        "diff": 20000,
         "maxConn": 32768
       }
     ]
@@ -148,7 +148,6 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 
 	"payout": {
 		"poolRation": 5.0,
-		"fundRation": 5.0,
 		"rewardRation": 5.0,
 		"directRation": 5.0,
     // threshhold to pay miner
@@ -164,4 +163,4 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 
 You must use ``<address>.WorkerID`` as username in your miner. If there is no workerID specified your rig stats will be merged under `0` worker. 
 
-Copy your wallet data folder xdagj_wallet to pool path.
+Copy your wallet data folder ``xdagj_wallet`` to pool path.

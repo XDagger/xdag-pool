@@ -10,8 +10,8 @@
 	"hashrateWindow": "30m",
 	"hashrateLargeWindow": "3h",
 	"node_name": "example.equal",
-	"node_rpc": "https://test-rpc.xdagj.org",
-	"node_ws": "ws://test-rpc.xdagj.org",
+	"node_rpc": "http://testnet-rpc.xdagj.org:10001",
+	"node_ws": "ws://118.26.111.179:7001/",
 	"ws_ssl": false,
 	"log": {
 		"logSetLevel": 10
@@ -23,7 +23,7 @@
 			{
 				"host": "0.0.0.0",
 				"port": 3003,
-				"diff": 300000,
+				"diff": 20000,
 				"maxConn": 50000
 			}
 		]
@@ -35,7 +35,7 @@
 			{
 				"host": "0.0.0.0",
 				"port": 13003,
-				"diff": 300000,
+				"diff": 20000,
 				"maxConn": 50000
 			}
 		],

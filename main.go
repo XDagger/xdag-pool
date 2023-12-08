@@ -59,9 +59,8 @@ func startStratum() {
 	}
 
 	s := stratum.NewStratum(&cfg, backend, msgChan)
-	if cfg.Frontend.Enabled {
-		go startFrontend(&cfg, s)
-	}
+
+	go startFrontend(&cfg, s)
 
 	if cfg.StratumTls.Enabled {
 		s.ListenTLS()
@@ -78,9 +77,12 @@ func startStratum() {
 func startFrontend(cfg *pool.Config, s *stratum.StratumServer) {
 	r := mux.NewRouter()
 	r.HandleFunc("/stats", s.StatsIndex)
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./www/")))
+	r.HandleFunc("/rank/{start}/{end}", s.HashrateRank).Methods("GET", "POST")
+	if cfg.Frontend.Enabled {
+		r.PathPrefix("/").Handler(http.FileServer(http.Dir("./www/")))
+	}
 	var err error
-	if len(cfg.Frontend.Password) > 0 {
+	if cfg.Frontend.Enabled && len(cfg.Frontend.Password) > 0 {
 		auth := httpauth.SimpleBasicAuth(cfg.Frontend.Login, cfg.Frontend.Password)
 		err = http.ListenAndServe(cfg.Frontend.Listen, auth(r))
 	} else {

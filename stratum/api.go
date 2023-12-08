@@ -3,11 +3,13 @@ package stratum
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/XDagger/xdagpool/util"
 	"github.com/XDagger/xdagpool/ws"
+	"github.com/gorilla/mux"
 )
 
 func (s *StratumServer) StatsIndex(w http.ResponseWriter, r *http.Request) {
@@ -154,4 +156,116 @@ func (s *StratumServer) getBlocksStats() []interface{} {
 		}
 	}
 	return result
+}
+
+func (s *StratumServer) PoolDonate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) PoolBalance(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) PoolRewards(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) HashrateRank(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	start := vars["start"]
+	end := vars["end"]
+	if start == "" || end == "" {
+		data["code"] = -1
+		data["msg"] = "parameter empty"
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	startNo, err1 := strconv.Atoi(start)
+	endNo, err2 := strconv.Atoi(end)
+	if err1 != nil || err2 != nil {
+		data["code"] = -1
+		data["msg"] = "parameter not number"
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	if startNo > endNo {
+		data["code"] = -1
+		data["msg"] = "start bigger than end"
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	ranks, err := util.HashrateRank.GetRanks(startNo, endNo)
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	data["code"] = 0
+	data["data"] = ranks
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) MinerAccount(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) MinerRewards(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) MinerPayments(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) MinerList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) PoolHashrate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) MinerHashrate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	_ = json.NewEncoder(w).Encode(data)
 }
