@@ -77,7 +77,15 @@ func startStratum() {
 func startFrontend(cfg *pool.Config, s *stratum.StratumServer) {
 	r := mux.NewRouter()
 	r.HandleFunc("/stats", s.StatsIndex)
-	r.HandleFunc("/rank/{start}/{end}", s.HashrateRank).Methods("GET", "POST")
+	r.HandleFunc("/hashrate/rank/{page}/{pageSize}", s.HashrateRank).Methods("GET", "POST")
+	r.HandleFunc("/pool/account", s.PoolAccount).Methods("GET", "POST")
+	r.HandleFunc("/pool/donate/{page}/{pageSize}", s.PoolDonateList).Methods("GET", "POST")
+	r.HandleFunc("/pool/rewards/{page}/{pageSize}", s.PoolRewardsList).Methods("GET", "POST")
+	r.HandleFunc("/miner/account/{address}", s.MinerAccount).Methods("GET", "POST")
+	r.HandleFunc("/miner/rewards/{address}/{page}/{pageSize}", s.MinerRewardsList).Methods("GET", "POST")
+	r.HandleFunc("/miner/payment/{address}/{page}/{pageSize}", s.MinerPaymentList).Methods("GET", "POST")
+	r.HandleFunc("/miner/balance/{address}/{page}/{pageSize}", s.MinerBalanceList).Methods("GET", "POST")
+
 	if cfg.Frontend.Enabled {
 		r.PathPrefix("/").Handler(http.FileServer(http.Dir("./www/")))
 	}

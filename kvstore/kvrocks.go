@@ -140,6 +140,7 @@ func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts in
 	tx := r.client.TxPipeline()
 	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "rewards", int64(reward.Amount*1e9))
 	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "unpaid", int64(reward.Amount*1e9))
+	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "donate", int64(reward.Donate*1e9))
 	tx.ZAdd(ctx, r.formatKey("pool", "rewards"), redis.Z{Score: float64(ts),
 		Member: join(reward.Amount, reward.Fee, ms, reward.TxBlock, reward.PreHash, login, reward.Share)})
 	tx.ZAdd(ctx, r.formatKey("pool", "donate"), redis.Z{Score: float64(ts),

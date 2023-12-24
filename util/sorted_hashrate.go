@@ -80,15 +80,16 @@ func (s *SortedHashrate) IncShareByKey(key string, share int64) {
 }
 
 // start begin with 1, get [start,end] items, get all items when [1, -1]
-func (s *SortedHashrate) GetRanks(start, end int) ([]Rank, error) {
+func (s *SortedHashrate) GetRanks(start, end int) ([]Rank, int, error) {
 	s.lastLock.RLock()
 	defer s.lastLock.RUnlock()
 	if s.Last == nil {
-		return nil, errors.New("hashrate rank not ready")
+		return nil, 0, errors.New("hashrate rank not ready")
 	}
 	if start < 1 || start > end {
-		return nil, errors.New("input rank number error")
+		return nil, 0, errors.New("input rank number error")
 	}
+	count := s.Last.GetCount()
 	nodes := s.Last.GetByRankRange(-1*start, -1*end, false)
 	var ranks = make([]Rank, len(nodes))
 	for i := 0; i < len(nodes); i++ {
@@ -98,5 +99,5 @@ func (s *SortedHashrate) GetRanks(start, end int) ([]Rank, error) {
 		}
 		ranks = append(ranks, r)
 	}
-	return ranks, nil
+	return ranks, count, nil
 }

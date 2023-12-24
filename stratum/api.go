@@ -158,26 +158,147 @@ func (s *StratumServer) getBlocksStats() []interface{} {
 	return result
 }
 
-func (s *StratumServer) PoolDonate(w http.ResponseWriter, r *http.Request) {
+func (s *StratumServer) PoolDonateList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	num := vars["page"]
+	size := vars["pageSize"]
+	if num == "" || size == "" {
+		data["code"] = -1
+		data["msg"] = "parameter empty"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	page, err1 := strconv.Atoi(num)
+	pageSize, err2 := strconv.Atoi(size)
+	if err1 != nil || err2 != nil {
+		data["code"] = -1
+		data["msg"] = "parameter not number"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 10 {
+		pageSize = 10
+	}
+	start := (page-1)*pageSize + 1
+	end := start + pageSize - 1
+
+	amount, count, err := s.backend.GetTotalDonate()
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	list, err := s.backend.GetDonateList(int64(start), int64(end))
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	data["code"] = 0
+	data["msg"] = "success"
+	data["amount"] = amount
+	data["page"] = page
+	data["pageSize"] = pageSize
+	data["total"] = count
+	data["data"] = list
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (s *StratumServer) PoolAccount(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+
+	rewards, payment, unpaid, donate, err := s.backend.GetPoolAccount()
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	data["code"] = 0
+	data["msg"] = "success"
+	data["totalRewards"] = rewards
+	data["totalPayment"] = payment
+	data["totalUnpaid"] = unpaid
+	data["totalDonate"] = donate
 
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *StratumServer) PoolBalance(w http.ResponseWriter, r *http.Request) {
+func (s *StratumServer) PoolRewardsList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	num := vars["page"]
+	size := vars["pageSize"]
+	if num == "" || size == "" {
+		data["code"] = -1
+		data["msg"] = "parameter empty"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	page, err1 := strconv.Atoi(num)
+	pageSize, err2 := strconv.Atoi(size)
+	if err1 != nil || err2 != nil {
+		data["code"] = -1
+		data["msg"] = "parameter not number"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 10 {
+		pageSize = 10
+	}
+	start := (page-1)*pageSize + 1
+	end := start + pageSize - 1
 
-	_ = json.NewEncoder(w).Encode(data)
-}
+	amount, count, err := s.backend.GetTotalPoolRewards()
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
 
-func (s *StratumServer) PoolRewards(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	data := make(map[string]interface{})
+	list, err := s.backend.GetPoolRewardsList(int64(start), int64(end))
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	data["code"] = 0
+	data["msg"] = "success"
+	data["amount"] = amount
+	data["page"] = page
+	data["pageSize"] = pageSize
+	data["total"] = count
+	data["data"] = list
 
 	_ = json.NewEncoder(w).Encode(data)
 }
@@ -187,37 +308,45 @@ func (s *StratumServer) HashrateRank(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	data := make(map[string]interface{})
 	vars := mux.Vars(r)
-	start := vars["start"]
-	end := vars["end"]
-	if start == "" || end == "" {
+	num := vars["page"]
+	size := vars["pageSize"]
+	if num == "" || size == "" {
 		data["code"] = -1
 		data["msg"] = "parameter empty"
+		data["data"] = ""
 		_ = json.NewEncoder(w).Encode(data)
 		return
 	}
-	startNo, err1 := strconv.Atoi(start)
-	endNo, err2 := strconv.Atoi(end)
+	page, err1 := strconv.Atoi(num)
+	pageSize, err2 := strconv.Atoi(size)
 	if err1 != nil || err2 != nil {
 		data["code"] = -1
 		data["msg"] = "parameter not number"
+		data["data"] = ""
 		_ = json.NewEncoder(w).Encode(data)
 		return
 	}
-
-	if startNo > endNo {
-		data["code"] = -1
-		data["msg"] = "start bigger than end"
-		_ = json.NewEncoder(w).Encode(data)
-		return
+	if page < 1 {
+		page = 1
 	}
-	ranks, err := util.HashrateRank.GetRanks(startNo, endNo)
+	if pageSize < 10 {
+		pageSize = 10
+	}
+	start := (page-1)*pageSize + 1
+	end := start + pageSize - 1
+	ranks, count, err := util.HashrateRank.GetRanks(start, end)
 	if err != nil {
 		data["code"] = -1
 		data["msg"] = err.Error()
+		data["data"] = ""
 		_ = json.NewEncoder(w).Encode(data)
 		return
 	}
 	data["code"] = 0
+	data["msg"] = "success"
+	data["page"] = page
+	data["pageSize"] = pageSize
+	data["total"] = count
 	data["data"] = ranks
 	_ = json.NewEncoder(w).Encode(data)
 }
@@ -226,46 +355,242 @@ func (s *StratumServer) MinerAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	address := vars["address"]
+	if address == "" || !util.ValidateAddress(address) {
+		data["code"] = -1
+		data["msg"] = "addres is empty address or invalid"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	reward, payment, unpaid, err := s.backend.GetMinerAccount(address)
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	data["code"] = 0
+	data["msg"] = "success"
+	data["totalReward"] = reward
+	data["totalPayment"] = payment
+	data["totalUnpaid"] = unpaid
 
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *StratumServer) MinerRewards(w http.ResponseWriter, r *http.Request) {
+func (s *StratumServer) MinerRewardsList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	address := vars["address"]
+	if address == "" || !util.ValidateAddress(address) {
+		data["code"] = -1
+		data["msg"] = "addres is empty address or invalid"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	num := vars["page"]
+	size := vars["pageSize"]
+	if num == "" || size == "" {
+		data["code"] = -1
+		data["msg"] = "page parameter empty"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	page, err1 := strconv.Atoi(num)
+	pageSize, err2 := strconv.Atoi(size)
+	if err1 != nil || err2 != nil {
+		data["code"] = -1
+		data["msg"] = "page parameter not number"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 10 {
+		pageSize = 10
+	}
+	start := (page-1)*pageSize + 1
+	end := start + pageSize - 1
+
+	amount, count, err := s.backend.MinerTotalRewards(address)
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	list, err := s.backend.MinerRewardsList(address, int64(start), int64(end))
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	data["code"] = 0
+	data["msg"] = "success"
+	data["amount"] = amount
+	data["page"] = page
+	data["pageSize"] = pageSize
+	data["total"] = count
+	data["data"] = list
 
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *StratumServer) MinerPayments(w http.ResponseWriter, r *http.Request) {
+func (s *StratumServer) MinerPaymentList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	address := vars["address"]
+	if address == "" || !util.ValidateAddress(address) {
+		data["code"] = -1
+		data["msg"] = "addres is empty address or invalid"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	num := vars["page"]
+	size := vars["pageSize"]
+	if num == "" || size == "" {
+		data["code"] = -1
+		data["msg"] = "page parameter empty"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	page, err1 := strconv.Atoi(num)
+	pageSize, err2 := strconv.Atoi(size)
+	if err1 != nil || err2 != nil {
+		data["code"] = -1
+		data["msg"] = "page parameter not number"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 10 {
+		pageSize = 10
+	}
+	start := (page-1)*pageSize + 1
+	end := start + pageSize - 1
+
+	amount, count, err := s.backend.MinerTotalPayment(address)
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	list, err := s.backend.MinerPaymentList(address, int64(start), int64(end))
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	data["code"] = 0
+	data["msg"] = "success"
+	data["amount"] = amount
+	data["page"] = page
+	data["pageSize"] = pageSize
+	data["total"] = count
+	data["data"] = list
 
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *StratumServer) MinerList(w http.ResponseWriter, r *http.Request) {
+func (s *StratumServer) MinerBalanceList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	address := vars["address"]
+	if address == "" || !util.ValidateAddress(address) {
+		data["code"] = -1
+		data["msg"] = "addres is empty address or invalid"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	num := vars["page"]
+	size := vars["pageSize"]
+	if num == "" || size == "" {
+		data["code"] = -1
+		data["msg"] = "page parameter empty"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	page, err1 := strconv.Atoi(num)
+	pageSize, err2 := strconv.Atoi(size)
+	if err1 != nil || err2 != nil {
+		data["code"] = -1
+		data["msg"] = "page parameter not number"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 10 {
+		pageSize = 10
+	}
+	start := (page-1)*pageSize + 1
+	end := start + pageSize - 1
+
+	count, list, err := s.backend.MinerBalanceList(address, int64(start), int64(end))
+	if err != nil {
+		data["code"] = -1
+		data["msg"] = err.Error()
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	data["code"] = 0
+	data["msg"] = "success"
+	data["page"] = page
+	data["pageSize"] = pageSize
+	data["total"] = count
+	data["data"] = list
 
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *StratumServer) PoolHashrate(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	data := make(map[string]interface{})
+// func (s *StratumServer) PoolHashrate(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+// 	w.WriteHeader(http.StatusOK)
+// 	data := make(map[string]interface{})
 
-	_ = json.NewEncoder(w).Encode(data)
-}
+// 	_ = json.NewEncoder(w).Encode(data)
+// }
 
-func (s *StratumServer) MinerHashrate(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	data := make(map[string]interface{})
+// func (s *StratumServer) MinerHashrate(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+// 	w.WriteHeader(http.StatusOK)
+// 	data := make(map[string]interface{})
 
-	_ = json.NewEncoder(w).Encode(data)
-}
+// 	_ = json.NewEncoder(w).Encode(data)
+// }
