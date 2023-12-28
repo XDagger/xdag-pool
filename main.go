@@ -70,8 +70,8 @@ func startStratum() {
 		s.Listen()
 	}
 
-	quit := make(chan bool)
-	<-quit
+	// quit := make(chan bool)
+	// <-quit
 }
 
 func startFrontend(cfg *pool.Config, s *stratum.StratumServer) {
