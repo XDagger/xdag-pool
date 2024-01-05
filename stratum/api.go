@@ -359,7 +359,7 @@ func (s *StratumServer) MinerAccount(w http.ResponseWriter, r *http.Request) {
 	address := vars["address"]
 	if address == "" || !util.ValidateAddress(address) {
 		data["code"] = -1
-		data["msg"] = "addres is empty address or invalid"
+		data["msg"] = "addres is empty or invalid"
 		data["data"] = ""
 		_ = json.NewEncoder(w).Encode(data)
 		return
@@ -587,10 +587,44 @@ func (s *StratumServer) MinerBalanceList(w http.ResponseWriter, r *http.Request)
 // 	_ = json.NewEncoder(w).Encode(data)
 // }
 
-// func (s *StratumServer) MinerHashrate(w http.ResponseWriter, r *http.Request) {
-// 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-// 	w.WriteHeader(http.StatusOK)
-// 	data := make(map[string]interface{})
+func (s *StratumServer) MinerHashrate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	data := make(map[string]interface{})
+	vars := mux.Vars(r)
+	address := vars["address"]
+	if address == "" || !util.ValidateAddress(address) {
+		data["code"] = -1
+		data["msg"] = "addres is empty or invalid"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	works := s.workers.GetWorkers(address)
+	if len(works) == 0 {
+		data["code"] = -1
+		data["msg"] = "no works"
+		data["data"] = ""
+		_ = json.NewEncoder(w).Encode(data)
+		return
+	}
+	var hashrate = make(map[string]float64)
+	var hashrate24h = make(map[string]float64)
+	window24h := 24 * time.Hour
+	for _, w := range works {
+		m, ok := s.miners.Get(address + "." + w)
+		if !ok {
+			continue
+		}
+		hashrate[w] = m.hashrate(s.estimationWindow)
+		hashrate24h[w] = m.hashrate(window24h)
+	}
+	var h = make(map[string]interface{})
+	h["hashrate"] = hashrate
+	h["hashrate24h"] = hashrate24h
 
-// 	_ = json.NewEncoder(w).Encode(data)
-// }
+	data["code"] = 0
+	data["msg"] = "success"
+	data["data"] = h
+	_ = json.NewEncoder(w).Encode(data)
+}

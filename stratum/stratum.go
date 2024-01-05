@@ -18,7 +18,6 @@ import (
 
 	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/util"
-	. "github.com/XDagger/xdagpool/util"
 )
 
 type StratumServer struct {
@@ -28,6 +27,7 @@ type StratumServer struct {
 	blockStats      map[int64]blockEntry
 	config          *pool.Config
 	miners          MinersMap
+	workers         WorkersMap
 	blockTemplate   atomic.Value
 	// upWsClient          *ws.Socket
 	timeout             time.Duration
@@ -90,9 +90,10 @@ func NewStratum(cfg *pool.Config, backend *kvstore.KvClient, msgChan chan pool.M
 		maxConcurrency: cfg.Threads}
 
 	// stratum.upWsClient = ws.NewRpcClient(cfg.NodeWs, cfg.WsSsl)
-	// Info.Printf("Upstream ws: %s => %s", cfg.NodeName, cfg.NodeWs)
+	// util.Info.Printf("Upstream ws: %s => %s", cfg.NodeName, cfg.NodeWs)
 
 	stratum.miners = NewMinersMap()
+	stratum.workers = NewWorkersMap()
 	stratum.sessions = make(map[*Session]struct{})
 
 	timeout, _ := time.ParseDuration(cfg.Stratum.Timeout)
@@ -115,9 +116,9 @@ func NewStratum(cfg *pool.Config, backend *kvstore.KvClient, msgChan chan pool.M
 	luckLargeWindow, _ := time.ParseDuration(cfg.LargeLuckWindow)
 	stratum.luckLargeWindow = int64(luckLargeWindow / time.Millisecond)
 
-	purgeIntv := MustParseDuration(cfg.PurgeInterval)
+	purgeIntv := util.MustParseDuration(cfg.PurgeInterval)
 	purgeTimer := time.NewTimer(purgeIntv)
-	Info.Printf("Set purge interval to %v", purgeIntv)
+	util.Info.Printf("Set purge interval to %v", purgeIntv)
 
 	// purge stale
 	go func() {
@@ -148,7 +149,7 @@ func NewEndpoint(cfg *pool.Port) *Endpoint {
 	e.instanceId = make([]byte, 4)
 	_, err := rand.Read(e.instanceId) // random instance id
 	if err != nil {
-		Error.Fatalf("Can't seed with random bytes: %v", err)
+		util.Error.Fatalf("Can't seed with random bytes: %v", err)
 	}
 	e.targetHex = util.GetTargetHex(e.config.Difficulty) // default 000037EC8EC25E6D
 	e.difficulty = big.NewInt(e.config.Difficulty)       //default 300000
@@ -177,15 +178,15 @@ func (e *Endpoint) Listen(s *StratumServer) {
 	bindAddr := fmt.Sprintf("%s:%d", e.config.Host, e.config.Port)
 	addr, err := net.ResolveTCPAddr("tcp", bindAddr)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 	server, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 	defer server.Close()
 
-	Info.Printf("Stratum listening on %s", bindAddr)
+	util.Info.Printf("Stratum listening on %s", bindAddr)
 	accept := make(chan int, e.config.MaxConn)
 	n := 0
 
@@ -212,7 +213,7 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 
 	cert, err := tls.LoadX509KeyPair(t.TlsCert, t.TlsKey)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 
 	tlsConfig := &tls.Config{}
@@ -222,11 +223,11 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 
 	server, err := tls.Listen("tcp", bindAddr, tlsConfig)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 	defer server.Close()
 
-	Info.Printf("Stratum TLS listening on %s", bindAddr)
+	util.Info.Printf("Stratum TLS listening on %s", bindAddr)
 	accept := make(chan int, e.config.MaxConn)
 	n := 0
 
@@ -235,7 +236,7 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 		if err != nil {
 			continue
 		}
-		Info.Printf("Accept Stratum TLS Connection from: %s, to: %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
+		util.Info.Printf("Accept Stratum TLS Connection from: %s, to: %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 
@@ -244,7 +245,7 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 			state := tlsConn.ConnectionState()
 			for _, v := range state.PeerCertificates {
 				pKIXPublicKey, _ := x509.MarshalPKIXPublicKey(v.PublicKey)
-				Info.Printf("x509.MarshalPKIXPublicKey: %v", pKIXPublicKey)
+				util.Info.Printf("x509.MarshalPKIXPublicKey: %v", pKIXPublicKey)
 			}
 		} else {
 			_ = conn.Close()
@@ -269,17 +270,17 @@ func (s *StratumServer) handleClient(cs *Session, e *Endpoint) {
 	for {
 		data, isPrefix, err := connbuff.ReadLine()
 		if isPrefix {
-			Info.Println("Socket flood detected from", cs.ip)
+			util.Info.Println("Socket flood detected from", cs.ip)
 			break
 		} else if err == io.EOF {
 			if cs.login == "" && cs.id == "" {
-				Info.Println("Client disconnected from", cs.ip)
+				util.Info.Println("Client disconnected from", cs.ip)
 			} else {
-				Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
+				util.Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
 			}
 			break
 		} else if err != nil {
-			Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
+			util.Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
 			break
 		}
 
@@ -289,17 +290,18 @@ func (s *StratumServer) handleClient(cs *Session, e *Endpoint) {
 			var req JSONRpcReq
 			err = json.Unmarshal(data, &req)
 			if err != nil {
-				Error.Printf("Malformed request from %s: %v", cs.ip, err)
+				util.Error.Printf("Malformed request from %s: %v", cs.ip, err)
 				break
 			}
 			s.setDeadline(cs.conn)
 			err = cs.handleMessage(s, e, &req)
 			if err != nil {
-				Error.Printf("handleTCPMessage: %v", err)
+				util.Error.Printf("handleTCPMessage: %v", err)
 				break
 			}
 		}
 	}
+	s.removeMiner(cs.uid)
 	s.removeSession(cs)
 	_ = cs.conn.Close()
 }
@@ -311,17 +313,17 @@ func (s *StratumServer) handleTLSClient(cs *Session, e *Endpoint) {
 	for {
 		data, isPrefix, err := connbuff.ReadLine()
 		if isPrefix {
-			Info.Println("Socket flood detected from", cs.ip)
+			util.Info.Println("Socket flood detected from", cs.ip)
 			break
 		} else if err == io.EOF {
 			if cs.login == "" && cs.id == "" {
-				Info.Println("Client disconnected from", cs.ip)
+				util.Info.Println("Client disconnected from", cs.ip)
 			} else {
-				Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
+				util.Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
 			}
 			break
 		} else if err != nil {
-			Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
+			util.Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
 			break
 		}
 
@@ -331,17 +333,18 @@ func (s *StratumServer) handleTLSClient(cs *Session, e *Endpoint) {
 			var req JSONRpcReq
 			err = json.Unmarshal(data, &req)
 			if err != nil {
-				Error.Printf("Malformed request from %s: %v", cs.ip, err)
+				util.Error.Printf("Malformed request from %s: %v", cs.ip, err)
 				break
 			}
 			s.setTLSDeadline(cs.tlsConn)
 			err = cs.handleMessage(s, e, &req)
 			if err != nil {
-				Error.Printf("handleTCPMessage: %v", err)
+				util.Error.Printf("handleTCPMessage: %v", err)
 				break
 			}
 		}
 	}
+	s.removeMiner(cs.uid)
 	s.removeSession(cs)
 	_ = cs.tlsConn.Close()
 }
@@ -349,11 +352,11 @@ func (s *StratumServer) handleTLSClient(cs *Session, e *Endpoint) {
 func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq) error {
 	if req.Id == nil {
 		err := fmt.Errorf("server disconnect request")
-		Error.Println(err)
+		util.Error.Println(err)
 		return err
 	} else if req.Params == nil {
 		err := fmt.Errorf("server RPC request params")
-		Error.Println(err)
+		util.Error.Println(err)
 		return err
 	}
 
@@ -364,7 +367,7 @@ func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq)
 		var params LoginParams
 		err := json.Unmarshal(*req.Params, &params)
 		if err != nil {
-			Error.Println("Unable to parse params: login")
+			util.Error.Println("Unable to parse params: login")
 			return err
 		}
 		reply, errReply := s.handleLoginRPC(cs, &params)
@@ -376,7 +379,7 @@ func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq)
 		var params GetJobParams
 		err := json.Unmarshal(*req.Params, &params)
 		if err != nil {
-			Error.Println("Unable to parse params: getjob")
+			util.Error.Println("Unable to parse params: getjob")
 			return err
 		}
 		reply, errReply := s.handleGetJobRPC(cs, &params)
@@ -388,7 +391,7 @@ func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq)
 		var params SubmitParams
 		err := json.Unmarshal(*req.Params, &params)
 		if err != nil {
-			Error.Println("Unable to parse params: submit")
+			util.Error.Println("Unable to parse params: submit")
 			return err
 		}
 		reply, errReply := s.handleSubmitRPC(cs, &params)
@@ -478,8 +481,8 @@ func (s *StratumServer) purgeStale() {
 	start := time.Now()
 	total, err := s.backend.FlushStaleStats(s.hashrateWindow, s.hashrateLargeWindow)
 	if err != nil {
-		Error.Println("Failed to purge stale data from backend:", err)
+		util.Error.Println("Failed to purge stale data from backend:", err)
 	} else {
-		Info.Printf("Purged stale stats from backend, %v shares affected, elapsed time %v", total, time.Since(start))
+		util.Info.Printf("Purged stale stats from backend, %v shares affected, elapsed time %v", total, time.Since(start))
 	}
 }

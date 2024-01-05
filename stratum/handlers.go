@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -40,6 +41,15 @@ func (s *StratumServer) handleLoginRPC(cs *Session, params *LoginParams) (*JobRe
 	if !ok {
 		miner = NewMiner(cs.uid, cs.id, cs.ip, s.maxConcurrency)
 		s.registerMiner(miner)
+	}
+
+	ids, ok := s.workers.Get(address)
+	if !ok {
+		m := new(sync.Map)
+		m.Store(id, struct{}{})
+		s.workers.Set(address, m)
+	} else {
+		ids.Store(id, struct{}{})
 	}
 
 	util.Info.Printf("Miner connected %s.%s@%s", cs.login, cs.id, cs.ip)
