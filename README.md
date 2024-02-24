@@ -22,85 +22,6 @@ Dependencies:
   * RandomX
 
 
-<!-- ### Linux
-
-Use Ubuntu 16.04 LTS.
-
-    sudo apt-get install libssl-dev
-    sudo apt-get install git cmake build-essential pkg-config libboost-all-dev libreadline-dev doxygen libsodium-dev libzmq5-dev
-    sudo apt-get install liblmdb-dev libevent-dev libjson-c-dev uuid-dev
-
-Use Ubuntu 18.04 LTS.
-
-    sudo apt-get install libssl1.0-dev
-    sudo apt-get install git cmake build-essential pkg-config libboost-all-dev libreadline-dev doxygen libsodium-dev libzmq5-dev 
-    sudo apt-get install liblmdb-dev libevent-dev libjson-c-dev uuid-dev
-
-
-Compile Monero source (with shared libraries option):
-
-    git clone --recursive https://github.com/monero-project/monero.git
-    cd monero
-    git checkout tags/v0.17.0.0 -b v0.17.0.0
-    cmake -DBUILD_SHARED_LIBS=1 -DMANUAL_SUBMODULES=1 .
-    make
-
-Install Golang and required packages:
-
-    sudo apt install software-properties-common
-    sudo add-apt-repository ppa:longsleep/golang-backports
-    sudo apt-get update
-    sudo apt-get install golang-go
-
-Clone:
-
-    git clone https://github.com/XDagger/xdagpool.git
-    cd xmrpool
-
-Build stratum:
-
-    export MONERO_DIR=[path_of_monero] 
-    cmake .
-    make
-    make -f Makefile_build_info
-
-`MONERO_DIR=/path/to/monero` is optional, not needed if both `monero` and `xmrpool` is in the same directory like `/opt/src/`. By default make will search for monero libraries in `../monero`. You can just run `cmake .`.
-
-### Mac OS X
-
-Compile Monero source:
-
-    git clone --recursive https://github.com/monero-project/monero.git
-    cd monero
-    git checkout tags/v0.17.0.0 -b v0.17.0.0
-    cmake .
-    make
-
-Install Golang and required packages:
-
-    brew update && brew install go
-
-Clone stratum:
-
-    git clone https://github.com/XDagger/xdagpool.git
-    cd xmrpool
-
-Build stratum:
-
-    MONERO_DIR=[path_of_monero]  
-    cmake .
-    make
-    make -f Makefile_build_info
-
-### Running Stratum
-
-    ./build/bin/xmrpool config.json
-
-If you need to bind to privileged ports and don't want to run from `root`:
-
-    sudo apt-get install libcap2-bin
-    sudo setcap 'cap_net_bind_service=+ep' /path/to/xmrpool -->
-
 ## Configuration
 
 Configuration is self-describing, just copy *config.example.json* to *config.json* and run stratum with path to config file as 1st argument.
@@ -164,3 +85,59 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 You must use ``<address>.WorkerID`` as username in your miner. If there is no workerID specified your rig stats will be merged under `0` worker. 
 
 Copy your wallet data folder ``xdagj_wallet`` to pool path.
+
+## RPC
+
+### xdag_poolConfig
+#### request
+```
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data "{"jsonrpc":"2.0","method":"xdag_poolConfig","params":[],"id":1}"
+```
+
+#### response
+```
+{"jsonrpc":"2.0","id":1,"result":
+{"poolIp":"127.0.0.1","poolPort":7001,"nodeIp":"127.0.0.1","nodePort":8001,"globalMiner
+Limit":8192,"maxConnectMinerPerIp":256,"maxMinerPerAccount":256,"poolFeeRation":"5.0","
+poolRewardRation":"5.0","poolDirectRation":"5.0","poolFundRation":"0.0","threshold":"3"}}
+```
+
+### xdag_updatePoolConfig
+#### request
+```
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data "{"jsonrpc":"2.0","method":"xdag_updatePoolConfig","params":[{"poolFeeRation":"4","poolRewardRation":"4","poolDirectRation":"4","threshold":"4"},"pool_password"],"id":1}"
+```
+#### response
+```
+{"jsonrpc":"2.0","id":1,"result":"Success"}
+```
+
+### xdag_getPoolWorkers
+#### request
+```
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data
+"{"jsonrpc":"2.0","method":"xdag_getPoolWorkers","params":[],"id":1}"
+```
+
+#### response
+```
+json {"jsonrpc":"2.0","id":1,"result":
+[{"address":"pCuGwAx/THicdSMFiy7vPgixsSP9AVRQ","status":"fee","unpaidShares":0.0,"hashr
+ate":2.2551405187698493E-18,"workers":[]},
+{"address":"oJA3+RpvYRb0eJKdUo38XTxLRhqircNa","status":"MINER_ACTIVE","unpaidShares":0.
+02088520508135681,"hashrate":3.9752369225781053E-4,"workers":
+[{"address":"172.31.100.234:48466","inBound":145,"outBound":438,"unpaidShares":0.020885
+20508135681,"name":"wb1","hashrate":3.9752369225781053E-4}]},
+{"address":"3oQtj/YtlIl8PGNWtqFR0QNo0dXJ+FDq","status":"MINER_ACTIVE","unpaidShares":1.
+5918582804382894E-8,"hashrate":2.8651250602006866E-8,"workers":
+[{"address":"172.31.100.234:53154","inBound":201,"outBound":260,"unpaidShares":1.591858
+2804382894E-8,"name":"", "hashrate":2.8651250602006866E-8}]},
+{"address":"jWx51h049qtJH68Zd0buxwW5xPML4GZR","status":"MINER_ACTIVE","unpaidShares":4.
+186463512272553E-4,"hashrate":0.0012218697372245008,"workers":
+[{"address":"172.31.100.234:48488","inBound":108,"outBound":327,"unpaidShares":1.893309
+5261087333E-4,"name":"wb2","hashrate":5.014658633706342E-4}
+{"address":"172.31.100.234:48490","inBound":89,"outBound":295,"unpaidShares":4.18646351
+2272553E-4,"name":"wb3","hashrate":3.704957506989368E-4},
+{"address":"172.31.100.234:48492","inBound":102,"outBound":295,"unpaidShares":1.6494257
+81936861E-4,"name":"wb4","hashrate":2.4399312515244604E-4}]}]}
+```
