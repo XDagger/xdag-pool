@@ -32,7 +32,7 @@ func (s *StratumServer) StatsIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stats["upstream"] = ws.Client.Url
-	stats["luck"] = s.getLuckStats()
+	// stats["luck"] = s.getLuckStats()
 	// stats["blocks"] = s.getBlocksStats()
 
 	if t := s.currentBlockTemplate(); t != nil {
@@ -101,43 +101,43 @@ func (s *StratumServer) collectMinersStats() (float64, float64, int, []interface
 	return totalhashrate, totalhashrate24h, totalOnline, result
 }
 
-func (s *StratumServer) getLuckStats() map[string]interface{} {
-	now := util.MakeTimestamp()
-	var variance float64
-	var totalVariance float64
-	var blocksCount int
-	var totalBlocksCount int
+// func (s *StratumServer) getLuckStats() map[string]interface{} {
+// 	now := util.MakeTimestamp()
+// 	var variance float64
+// 	var totalVariance float64
+// 	var blocksCount int
+// 	var totalBlocksCount int
 
-	s.blocksMu.Lock()
-	defer s.blocksMu.Unlock()
+// 	s.blocksMu.Lock()
+// 	defer s.blocksMu.Unlock()
 
-	for k, v := range s.blockStats {
-		if k >= now-s.luckWindow {
-			blocksCount++
-			variance += v.variance
-		}
-		if k >= now-s.luckLargeWindow {
-			totalBlocksCount++
-			totalVariance += v.variance
-		} else {
-			delete(s.blockStats, k)
-		}
-	}
-	if blocksCount != 0 {
-		variance = variance / float64(blocksCount)
-	}
-	if totalBlocksCount != 0 {
-		totalVariance = totalVariance / float64(totalBlocksCount)
-	}
-	result := make(map[string]interface{})
-	result["variance"] = variance
-	result["blocksCount"] = blocksCount
-	result["window"] = s.config.LuckWindow
-	result["totalVariance"] = totalVariance
-	result["totalBlocksCount"] = totalBlocksCount
-	result["largeWindow"] = s.config.LargeLuckWindow
-	return result
-}
+// 	for k, v := range s.blockStats {
+// 		if k >= now-s.luckWindow {
+// 			blocksCount++
+// 			variance += v.variance
+// 		}
+// 		if k >= now-s.luckLargeWindow {
+// 			totalBlocksCount++
+// 			totalVariance += v.variance
+// 		} else {
+// 			delete(s.blockStats, k)
+// 		}
+// 	}
+// 	if blocksCount != 0 {
+// 		variance = variance / float64(blocksCount)
+// 	}
+// 	if totalBlocksCount != 0 {
+// 		totalVariance = totalVariance / float64(totalBlocksCount)
+// 	}
+// 	result := make(map[string]interface{})
+// 	result["variance"] = variance
+// 	result["blocksCount"] = blocksCount
+// 	result["window"] = s.config.LuckWindow
+// 	result["totalVariance"] = totalVariance
+// 	result["totalBlocksCount"] = totalBlocksCount
+// 	result["largeWindow"] = s.config.LargeLuckWindow
+// 	return result
+// }
 
 // func (s *StratumServer) getBlocksStats() []interface{} {
 // 	now := util.MakeTimestamp()
