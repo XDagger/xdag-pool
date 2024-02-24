@@ -27,7 +27,6 @@ func EcdsaSign(key *secp256k1.PrivateKey, hash []byte) (r, s common.Field) {
 	// 	copy(s[:sLen], serial[:sLen])
 	// }
 
-	util.Debug.Println("Sign")
 	return signature.Bytes()
 }
 

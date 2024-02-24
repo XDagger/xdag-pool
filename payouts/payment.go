@@ -9,7 +9,7 @@ import (
 	"github.com/XDagger/xdagpool/util"
 )
 
-var backend *kvstore.KvClient = nil
+// var backend *kvstore.KvClient = nil
 
 func PaymentTask(ctx context.Context, cfg *pool.Config, backend *kvstore.KvClient) {
 	interval, err := time.ParseDuration(cfg.PayOut.PaymentInterval)
@@ -29,6 +29,8 @@ func PaymentTask(ctx context.Context, cfg *pool.Config, backend *kvstore.KvClien
 }
 
 func payMiners(cfg *pool.Config, backend *kvstore.KvClient) {
+	cfg.RLock()
+	defer cfg.RUnlock()
 	// find miners balance more than payment threshold
 	miners := backend.GetMinersToPay(cfg.PayOut.Threshold)
 	if len(miners) == 0 {

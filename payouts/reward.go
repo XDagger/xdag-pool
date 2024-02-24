@@ -43,6 +43,8 @@ func ProcessReward(cfg *pool.Config, backend *kvstore.KvClient, reward pool.Xdag
 }
 
 func dividend(cfg *pool.Config, backend *kvstore.KvClient, login string, reward pool.XdagjReward, ms, ts int64) {
+	cfg.RLock()
+	defer cfg.RUnlock()
 	poolFee := reward.Amount * cfg.PayOut.PoolRation / 100.0     // for pool owner
 	rewardFee := reward.Amount * cfg.PayOut.RewardRation / 100.0 // reward to lowest hash finder
 	directFee := reward.Amount * cfg.PayOut.DirectRation / 100.0 // divided equally to every miner

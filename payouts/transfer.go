@@ -243,7 +243,7 @@ func transactionSign(block string, key *secp256k1.PrivateKey, hasRemark bool) (s
 	hash := cryptography.HashTwice(b)
 
 	r, s := cryptography.EcdsaSign(key, hash[:])
-
+	util.Debug.Println("Sign")
 	return hex.EncodeToString(r[:]), hex.EncodeToString(s[:])
 }
 

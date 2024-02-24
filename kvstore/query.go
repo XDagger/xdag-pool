@@ -91,21 +91,31 @@ func (r *KvClient) GetPoolRewardsList(start, end int64) ([]PoolRewardsData, erro
 func (r *KvClient) GetMinerAccount(address string) (float64, float64, float64, error) {
 	reward, err := r.client.HGet(ctx, r.formatKey("account", address), "reward").Int64()
 	if err != nil {
-		util.Error.Println("get pool total donate error", err)
+		util.Error.Println("get miner total donate error", err, address)
 		return 0, 0, 0, err
 	}
 
 	payment, err := r.client.HGet(ctx, r.formatKey("account", address), "payment").Int64()
 	if err != nil {
-		util.Error.Println("get pool total payment error", err)
+		util.Error.Println("get miner total payment error", err, address)
 		return 0, 0, 0, err
 	}
 	unpaid, err := r.client.HGet(ctx, r.formatKey("account", address), "unpaid").Int64()
 	if err != nil {
-		util.Error.Println("get pool total unpaid error", err)
+		util.Error.Println("get miner total unpaid error", err, address)
 		return 0, 0, 0, err
 	}
 	return float64(reward) / 1e9, float64(payment) / 1e9, float64(unpaid) / 1e9, nil
+}
+
+func (r *KvClient) GetMinerUnpaid(address string) float64 {
+
+	unpaid, err := r.client.HGet(ctx, r.formatKey("account", address), "unpaid").Int64()
+	if err != nil {
+		util.Error.Println("get pool total unpaid error", err)
+		return 0
+	}
+	return float64(unpaid) / 1e9
 }
 
 func (r *KvClient) MinerTotalRewards(address string) (float64, int64, error) {

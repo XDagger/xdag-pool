@@ -71,8 +71,8 @@ func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint
 		return true, nil
 	}
 
-	util.HashrateRank.IncShareByKey(login, diff)   // accumulated for hashrate rank
-	util.HashrateRank.IncShareByKey("total", diff) // accumulated for total hashrate
+	// util.HashrateRank.IncShareByKey(login, diff)   // accumulated for hashrate rank
+	// util.HashrateRank.IncShareByKey("total", diff) // accumulated for total hashrate
 
 	tx := r.client.TxPipeline()
 	// defer tx.Close()

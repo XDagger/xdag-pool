@@ -1,6 +1,9 @@
 package pool
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"sync"
+)
 
 type StorageConfig struct {
 	Endpoint          string `json:"endpoint"`
@@ -22,6 +25,7 @@ type PayOutConfig struct {
 }
 
 type Config struct {
+	sync.RWMutex
 	AddressEncrypted   string     `json:"addressEncrypted"`
 	Address            string     `json:"-"`
 	Log                Log        `json:"log"`

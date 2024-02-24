@@ -19,10 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/goji/httpauth"
-	"github.com/gorilla/mux"
 	"golang.org/x/term"
 
+	"github.com/XDagger/xdagpool/jrpc"
 	"github.com/XDagger/xdagpool/ws"
 	"github.com/XDagger/xdagpool/xdago/base58"
 	"github.com/XDagger/xdagpool/xdago/cryptography"
@@ -74,28 +73,58 @@ func startStratum() {
 	// <-quit
 }
 
+func isFrontFile(p string) bool {
+	if p == "/" || p == "/style.css" || p == "/script.js" ||
+		p == "/handlebars-intl.min.js" {
+		return true
+	}
+	return false
+}
 func startFrontend(cfg *pool.Config, s *stratum.StratumServer) {
-	r := mux.NewRouter()
-	r.HandleFunc("/stats", s.StatsIndex)
-	r.HandleFunc("/hashrate/rank/{page}/{pageSize}", s.HashrateRank).Methods("GET", "POST")
-	r.HandleFunc("/pool/account", s.PoolAccount).Methods("GET", "POST")
-	r.HandleFunc("/pool/donate/{page}/{pageSize}", s.PoolDonateList).Methods("GET", "POST")
-	r.HandleFunc("/pool/rewards/{page}/{pageSize}", s.PoolRewardsList).Methods("GET", "POST")
-	r.HandleFunc("/miner/account/{address}", s.MinerAccount).Methods("GET", "POST")
-	r.HandleFunc("/miner/rewards/{address}/{page}/{pageSize}", s.MinerRewardsList).Methods("GET", "POST")
-	r.HandleFunc("/miner/payment/{address}/{page}/{pageSize}", s.MinerPaymentList).Methods("GET", "POST")
-	r.HandleFunc("/miner/balance/{address}/{page}/{pageSize}", s.MinerBalanceList).Methods("GET", "POST")
-
-	if cfg.Frontend.Enabled {
-		r.PathPrefix("/").Handler(http.FileServer(http.Dir("./www/")))
+	wwwFiles := func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			if isFrontFile(r.URL.Path) && r.Method == "GET" {
+				http.FileServer(http.Dir("./www")).ServeHTTP(w, r)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		}
+		return http.HandlerFunc(fn)
 	}
-	var err error
-	if cfg.Frontend.Enabled && len(cfg.Frontend.Password) > 0 {
-		auth := httpauth.SimpleBasicAuth(cfg.Frontend.Login, cfg.Frontend.Password)
-		err = http.ListenAndServe(cfg.Frontend.Listen, auth(r))
+	statsHandle := func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/stats" && r.Method == "GET" {
+				s.StatsIndex(w, r)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		}
+		return http.HandlerFunc(fn)
+	}
+	// r := mux.NewRouter()
+	// r.HandleFunc("/stats", s.StatsIndex)
+	// r.HandleFunc("/hashrate/rank/{page}/{pageSize}", s.HashrateRank).Methods("GET", "POST")
+	// r.HandleFunc("/pool/account", s.PoolAccount).Methods("GET", "POST")
+	// r.HandleFunc("/pool/donate/{page}/{pageSize}", s.PoolDonateList).Methods("GET", "POST")
+	// r.HandleFunc("/pool/rewards/{page}/{pageSize}", s.PoolRewardsList).Methods("GET", "POST")
+	// r.HandleFunc("/miner/account/{address}", s.MinerAccount).Methods("GET", "POST")
+	// r.HandleFunc("/miner/rewards/{address}/{page}/{pageSize}", s.MinerRewardsList).Methods("GET", "POST")
+	// r.HandleFunc("/miner/payment/{address}/{page}/{pageSize}", s.MinerPaymentList).Methods("GET", "POST")
+	// r.HandleFunc("/miner/balance/{address}/{page}/{pageSize}", s.MinerBalanceList).Methods("GET", "POST")
+	var apiServer *jrpc.Server
+	if len(cfg.Frontend.Password) > 0 {
+		apiServer = jrpc.NewServer("/api",
+			jrpc.Auth(cfg.Frontend.Login, cfg.Frontend.Password),
+			jrpc.WithMiddlewares(wwwFiles, statsHandle))
 	} else {
-		err = http.ListenAndServe(cfg.Frontend.Listen, r)
+		apiServer = jrpc.NewServer("/api", jrpc.WithMiddlewares(wwwFiles, statsHandle))
 	}
+
+	apiServer.Add("xdag_getPoolWorkers", s.XdagGetPoolWorkers)
+	apiServer.Add("xdag_poolConfig", s.XdagPoolConfig)
+	apiServer.Add("xdag_updatePoolConfig", s.XdagUpdatePoolConfig)
+
+	err := apiServer.Run(cfg.Frontend.Listen)
 	if err != nil {
 		util.Error.Fatal(err)
 	}
@@ -146,6 +175,7 @@ func readSecurityPass() ([]byte, error) {
 	}
 
 	SecurityPass, err := term.ReadPassword(fd)
+	fmt.Println(SecurityPass)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +314,7 @@ func main() {
 		}
 	}()
 	util.NewMinedShares()
-	util.NewHashrateRank(15)
+	// util.NewHashrateRank(15)
 	payouts.Cfg = &cfg
 	wg.Add(1)
 	go func() {
