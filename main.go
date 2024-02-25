@@ -175,7 +175,6 @@ func readSecurityPass() ([]byte, error) {
 	}
 
 	SecurityPass, err := term.ReadPassword(fd)
-	fmt.Println(SecurityPass)
 	if err != nil {
 		return nil, err
 	}

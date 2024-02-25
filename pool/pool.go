@@ -51,6 +51,8 @@ type Config struct {
 	NodeWs   string `json:"node_ws"`
 	WsSsl    bool   `json:"ws_ssl"`
 
+	RxMode string `json:"rx_mode"`
+
 	PayOut PayOutConfig `json:"payout"`
 }
 
