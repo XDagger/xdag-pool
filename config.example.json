@@ -13,6 +13,7 @@
 	"node_rpc": "http://testnet-rpc.xdagj.org:10001",
 	"node_ws": "ws://118.26.111.179:7001/",
 	"ws_ssl": false,
+	"rx_mode": "light",
 	"log": {
 		"logSetLevel": 10
 	},
