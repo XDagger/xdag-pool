@@ -136,8 +136,8 @@ func (m *Miner) hashrate(estimationWindow time.Duration) float64 {
 	return float64(totalShares) / float64(boundary)
 }
 
-func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTemplate, nonce string, result string,
-	hashrateExpiration time.Duration) bool {
+func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTemplate,
+	nonce string, result string) bool {
 	// r := s.rpc()
 
 	// 32 bytes (reserved) = 20 bytes (pool owner wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId) + 4 bytes (share nonce)
@@ -217,7 +217,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 		// atomic.StoreInt64(&r.LastSubmissionAt, now)
 
 		exist, err := s.backend.WriteBlock(cs.login, cs.id, share, cs.endpoint.difficulty.Int64(),
-			shareU64, t.timestamp, hashrateExpiration, t.jobHash)
+			shareU64, t.timestamp, t.jobHash)
 		if exist {
 			ms := util.MakeTimestamp()
 			ts := ms / 1000

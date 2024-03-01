@@ -64,7 +64,7 @@ func (s *StratumServer) fetchBlockTemplate(msg json.RawMessage) bool {
 	} else {
 		util.Info.Printf("New block to mine on %s at jobHash %s,  timestamp: %v", s.config.NodeName, reply.Data.PreHash, reply.Timestamp)
 	}
-	s.backend.AddWaiting(reply.Data.PreHash)
+	// s.backend.AddWaiting(reply.Data.PreHash)
 
 	newTemplate := BlockTemplate{
 		// diffInt64:  reply.Difficulty,

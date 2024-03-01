@@ -35,9 +35,10 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 
   "estimationWindow": "15m",
   "luckWindow": "24h",
-  "largeLuckWindow": "72h",
   // randomx mode: fast(3G ram), light(300M ram)
   "rx_mode":"fast",
+  //AES encrypted wallet password by pool key
+  "walletEncrypted": "9FilIh6x3WdWaC74YGg3qw==",
   "stratum": {
     // Socket timeout
     "timeout": "2m",

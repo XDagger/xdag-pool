@@ -25,13 +25,13 @@ redis hash store a miner's accumulated diff of a job
 HIncrBy(ctx, r.formatKey("job",jobHash), login, diff)   (miner.go: processShare->WriteBlock)
 
 redis hash store a pool's accumulated diff of a job
- HIncrBy(ctx, r.formatKey("pool","diff"), jobHash, diff)   (miner.go: processShare->WriteBlock)
+ HIncrBy(ctx, r.formatKey("pool", jobHash), "diff", diff)   (miner.go: processShare->WriteBlock)
 
 redis zset store pool rewards list from xdaxj (ts -> timestamp)(int64, [real value] * 1e9)
  key: "pool" + "rewards", Z:{Score: float64(ts), Member: join(reword, ms, txHash, jobHash, fee, share)} 
 
 redis zset store rewards list of a task (ts -> timestamp)(int64, [real value] * 1e9)
- key: "rewards" + joHash, Z:{Score: float64(ts), Member: join(reword, ms, miner, remark, mode)}  
+ key: "rewards" + joHash, Z:{Score: float64(ts), Member: join(reword, ms, miner, txHash)}  
 
 redis hash store a pool's total rewards from xdagj(int64, [real value] * 1e9)
  key: "pool" + "account",  field: "rewards",  value: total rewards from xdagj

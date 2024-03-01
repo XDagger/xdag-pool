@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+const PoolKey = "" // it can make pool boot/reboot without interfering.
+
 type StorageConfig struct {
 	Endpoint          string `json:"endpoint"`
 	PasswordEncrypted string `json:"passwordEncrypted"`
@@ -26,19 +28,18 @@ type PayOutConfig struct {
 
 type Config struct {
 	sync.RWMutex
-	AddressEncrypted   string     `json:"addressEncrypted"`
-	Address            string     `json:"-"`
-	Log                Log        `json:"log"`
-	Stratum            Stratum    `json:"stratum"`
-	StratumTls         StratumTls `json:"stratumTls"`
-	EstimationWindow   string     `json:"estimationWindow"`
-	LuckWindow         string     `json:"luckWindow"`
-	LargeLuckWindow    string     `json:"largeLuckWindow"`
-	HashRateExpiration string     `json:"hashRateExpiration"`
+	AddressEncrypted string     `json:"addressEncrypted"`
+	Address          string     `json:"-"`
+	Log              Log        `json:"log"`
+	Stratum          Stratum    `json:"stratum"`
+	StratumTls       StratumTls `json:"stratumTls"`
+	EstimationWindow string     `json:"estimationWindow"`
+	LuckWindow       string     `json:"luckWindow"`
+	// LargeLuckWindow  string     `json:"largeLuckWindow"`
 
-	PurgeInterval       string `json:"purgeInterval"`
-	HashrateWindow      string `json:"hashrateWindow"`
-	HashrateLargeWindow string `json:"hashrateLargeWindow"`
+	PurgeInterval string `json:"purgeInterval"`
+	PurgeWindow   string `json:"purgeWindow"`
+	// PurgeLargeWindow string `json:"purgeLargeWindow"`
 
 	Threads  int      `json:"threads"`
 	Frontend Frontend `json:"frontend"`
@@ -51,7 +52,9 @@ type Config struct {
 	NodeWs   string `json:"node_ws"`
 	WsSsl    bool   `json:"ws_ssl"`
 
-	RxMode string `json:"rx_mode"`
+	RxMode          string `json:"rx_mode"`
+	WalletEncrypted string `json:"walletEncrypted"`
+	WalletPswd      string `json:"-"`
 
 	PayOut PayOutConfig `json:"payout"`
 }

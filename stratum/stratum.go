@@ -21,26 +21,25 @@ import (
 )
 
 type StratumServer struct {
-	luckWindow      int64
-	luckLargeWindow int64
-	roundShares     int64
-	blockStats      map[int64]blockEntry
-	config          *pool.Config
-	miners          MinersMap
-	workers         WorkersMap
-	blockTemplate   atomic.Value
+	luckWindow int64
+	// luckLargeWindow int64
+	roundShares   int64
+	blockStats    map[int64]blockEntry
+	config        *pool.Config
+	miners        MinersMap
+	workers       WorkersMap
+	blockTemplate atomic.Value
 	// upWsClient          *ws.Socket
-	timeout             time.Duration
-	estimationWindow    time.Duration
-	hashrateWindow      time.Duration
-	hashrateLargeWindow time.Duration
+	timeout          time.Duration
+	estimationWindow time.Duration
+	purgeWindow      time.Duration
+	// purgeLargeWindow time.Duration
 
 	blocksMu   sync.RWMutex
 	sessionsMu sync.RWMutex
 	sessions   map[*Session]struct{}
 
-	backend            *kvstore.KvClient
-	hashrateExpiration time.Duration
+	backend *kvstore.KvClient
 
 	upstreamsStates []bool
 
@@ -102,19 +101,16 @@ func NewStratum(cfg *pool.Config, backend *kvstore.KvClient, msgChan chan pool.M
 	estimationWindow, _ := time.ParseDuration(cfg.EstimationWindow)
 	stratum.estimationWindow = estimationWindow
 
-	hashrateExpiration, _ := time.ParseDuration(cfg.HashRateExpiration)
-	stratum.hashrateExpiration = hashrateExpiration
+	purgeWindow, _ := time.ParseDuration(cfg.PurgeWindow)
+	stratum.purgeWindow = purgeWindow
 
-	hashrateWindow, _ := time.ParseDuration(cfg.HashrateWindow)
-	stratum.hashrateWindow = hashrateWindow
-
-	hashrateLargeWindow, _ := time.ParseDuration(cfg.HashrateLargeWindow)
-	stratum.hashrateLargeWindow = hashrateLargeWindow
+	// purgeLargeWindow, _ := time.ParseDuration(cfg.PurgeLargeWindow)
+	// stratum.purgeLargeWindow = purgeLargeWindow
 
 	luckWindow, _ := time.ParseDuration(cfg.LuckWindow)
 	stratum.luckWindow = int64(luckWindow / time.Millisecond)
-	luckLargeWindow, _ := time.ParseDuration(cfg.LargeLuckWindow)
-	stratum.luckLargeWindow = int64(luckLargeWindow / time.Millisecond)
+	// luckLargeWindow, _ := time.ParseDuration(cfg.LargeLuckWindow)
+	// stratum.luckLargeWindow = int64(luckLargeWindow / time.Millisecond)
 
 	purgeIntv := util.MustParseDuration(cfg.PurgeInterval)
 	purgeTimer := time.NewTimer(purgeIntv)
@@ -479,10 +475,10 @@ func (s *StratumServer) currentBlockTemplate() *BlockTemplate {
 
 func (s *StratumServer) purgeStale() {
 	start := time.Now()
-	total, err := s.backend.FlushStaleStats(s.hashrateWindow, s.hashrateLargeWindow)
+	total, err := s.backend.PurgeRecords(s.purgeWindow)
 	if err != nil {
-		util.Error.Println("Failed to purge stale data from backend:", err)
+		util.Error.Println("Failed to purge  data from backend:", err)
 	} else {
-		util.Info.Printf("Purged stale stats from backend, %v shares affected, elapsed time %v", total, time.Since(start))
+		util.Info.Printf("Purged stale stats from backend, %v records affected, elapsed time %v", total, time.Since(start))
 	}
 }

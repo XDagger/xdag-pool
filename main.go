@@ -230,6 +230,13 @@ func decryptPoolConfigure(cfg *pool.Config, passBytes []byte) error {
 	// 	cfg.RedisFailover.Password = string(b)
 	// }
 
+	// if cfg.Redis.Enabled {
+	b, err = util.Ae64Decode(cfg.WalletEncrypted, passBytes)
+	if err != nil {
+		return err
+	}
+	cfg.WalletPswd = string(b)
+
 	return nil
 }
 
@@ -269,10 +276,15 @@ func main() {
 
 	// set rlimit nofile value
 	util.SetRLimit(800000)
-
-	secPassBytes, err := readSecurityPass()
-	if err != nil {
-		util.Error.Fatal("Read Security Password error: ", err.Error())
+	var secPassBytes []byte
+	var err error
+	if pool.PoolKey == "" {
+		secPassBytes, err = readSecurityPass()
+		if err != nil {
+			util.Error.Fatal("Read Security Password error: ", err.Error())
+		}
+	} else {
+		secPassBytes = []byte(pool.PoolKey)
 	}
 
 	err = decryptPoolConfigure(&cfg, secPassBytes)
@@ -280,12 +292,12 @@ func main() {
 		util.Error.Fatal("Decrypt Pool Configure error: ", err.Error())
 	}
 
-	walletPass, err := readWalletPass()
-	if err != nil {
-		util.Error.Fatal("Read Wallet Password error: ", err.Error())
-	}
+	// walletPass, err := readWalletPass()
+	// if err != nil {
+	// 	util.Error.Fatal("Read Wallet Password error: ", err.Error())
+	// }
 
-	hasWallet, bipAddress := connectBipWallet(string(walletPass[:]))
+	hasWallet, bipAddress := connectBipWallet(cfg.WalletPswd) //string(walletPass[:]))
 	if !hasWallet {
 		util.Error.Fatal("Read Wallet files error")
 	}

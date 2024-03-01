@@ -2,7 +2,6 @@ package kvstore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -15,6 +14,8 @@ import (
 )
 
 var ctx = context.Background()
+
+const taskDuration = 20 * time.Minute
 
 type KvClient struct {
 	client *redis.Client
@@ -50,16 +51,17 @@ func (r *KvClient) WriteRejectShare(ms, ts int64, login, id string, diff int64) 
 	}
 	return nil
 }
-func (r *KvClient) writeShare(tx redis.Pipeliner, ms, ts int64, login, id string, diff int64, expire time.Duration) {
-	tx.HIncrBy(ctx, r.formatKey("shares", "roundCurrent"), login, diff)
-	tx.ZAdd(ctx, r.formatKey("hashrate"), redis.Z{Score: float64(ts), Member: join(diff, login, id, ms)})
-	tx.ZAdd(ctx, r.formatKey("hashrate", login), redis.Z{Score: float64(ts), Member: join(diff, id, ms)})
-	tx.Expire(ctx, r.formatKey("hashrate", login), expire) // Will delete hashrates for miners that gone
-	// tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
-}
+
+// func (r *KvClient) writeShare(tx redis.Pipeliner, ms, ts int64, login, id string, diff int64, expire time.Duration) {
+// 	tx.HIncrBy(ctx, r.formatKey("shares", "roundCurrent"), login, diff)
+// 	tx.ZAdd(ctx, r.formatKey("hashrate"), redis.Z{Score: float64(ts), Member: join(diff, login, id, ms)})
+// 	tx.ZAdd(ctx, r.formatKey("hashrate", login), redis.Z{Score: float64(ts), Member: join(diff, id, ms)})
+// 	tx.Expire(ctx, r.formatKey("hashrate", login), expire) // Will delete hashrates for miners that gone
+// 	// tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
+// }
 
 func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint64,
-	timestamp uint64, window time.Duration, jobHash string) (bool, error) {
+	timestamp uint64, jobHash string) (bool, error) {
 	// exist, err := r.checkPoWExist(login, params)
 	// if err != nil {
 	// 	return false, err
@@ -80,7 +82,7 @@ func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint
 	ms := util.MakeTimestamp()
 	ts := ms / 1000
 
-	r.writeShare(tx, ms, ts, login, id, diff, window)
+	// r.writeShare(tx, ms, ts, login, id, diff, window)
 	tx.HSet(ctx, r.formatKey("works", login+"."+id), "lastShare", strconv.FormatInt(ts, 10))
 	tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
 	tx.HSet(ctx, r.formatKey("stats"), "lastShare", strconv.FormatInt(ts, 10))
@@ -90,9 +92,10 @@ func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint
 
 	// tx.Rename(ctx, r.formatKey("shares", "roundCurrent"), r.formatRound(int64(height), params[0]))
 	// tx.HGetAll(ctx, r.formatRound(int64(height), params[0]))
-	tx.HIncrBy(ctx, r.formatKey("pool", "diff"), jobHash, diff) // accumulate pool diff of the job
+	tx.HIncrBy(ctx, r.formatKey("pool", jobHash), "diff", diff) // accumulate pool diff of the job
 	tx.HIncrBy(ctx, r.formatKey("job", jobHash), login, diff)   // accumulate miners diff of the job (identified by job hash)
-
+	tx.Expire(ctx, r.formatKey("job", jobHash), taskDuration)
+	tx.Expire(ctx, r.formatKey("pool", jobHash), taskDuration)
 	// cmds, err := tx.Exec(ctx)
 	_, err := tx.Exec(ctx)
 	if err != nil {
@@ -116,27 +119,29 @@ func (r *KvClient) SetMinerReward(login, txHash, jobHash string, reward float64,
 	tx := r.client.TxPipeline()
 	tx.HIncrBy(ctx, r.formatKey("account", login), "reward", int64(reward*1e9))
 	tx.HIncrBy(ctx, r.formatKey("account", login), "unpaid", int64(reward*1e9))
+	tx.ZAdd(ctx, r.formatKey("rewards", jobHash), redis.Z{Score: float64(ts), Member: join(reward, ms, txHash, login)})
 	tx.ZAdd(ctx, r.formatKey("rewards", login), redis.Z{Score: float64(ts), Member: join(reward, ms, txHash, jobHash)})
 	tx.ZAdd(ctx, r.formatKey("balance", login), redis.Z{Score: float64(ts), Member: join("reward", reward, ms, txHash, jobHash)})
 	_, err := tx.Exec(ctx)
 	return err
 }
 
-func (r *KvClient) AddWaiting(jobHash string) {
-	_, err := r.client.SAdd(ctx, r.formatKey("waiting"), jobHash).Result()
-	if err != nil {
-		util.Error.Println("add job waiting  set error", jobHash, err)
-	}
-}
+// func (r *KvClient) AddWaiting(jobHash string) {
+// 	_, err := r.client.SAdd(ctx, r.formatKey("waiting"), jobHash).Result()
+// 	if err != nil {
+// 		util.Error.Println("add job waiting  set error", jobHash, err)
+// 	}
+// }
 
 func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts int64) error {
-	res, err := r.client.SMove(ctx, r.formatKey("waiting"), r.formatKey("win"), reward.PreHash).Result()
-	if err != nil {
-		return err
-	}
-	if !res { // preHash not in waiting set
-		return errors.New("moved key not exist in source")
-	}
+	// res, err := r.client.SMove(ctx, r.formatKey("waiting"), r.formatKey("win"), reward.PreHash).Result()
+	// if err != nil {
+	// 	return err
+	// }
+	// if !res { // preHash not in waiting set
+	// 	return errors.New("moved key not exist in source")
+	// }
+
 	tx := r.client.TxPipeline()
 	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "rewards", int64(reward.Amount*1e9))
 	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "unpaid", int64(reward.Amount*1e9))
@@ -145,16 +150,17 @@ func (r *KvClient) SetWinReward(login string, reward pool.XdagjReward, ms, ts in
 		Member: join(reward.Amount, reward.Fee, ms, reward.TxBlock, reward.PreHash, login, reward.Share)})
 	tx.ZAdd(ctx, r.formatKey("pool", "donate"), redis.Z{Score: float64(ts),
 		Member: join(reward.Donate, ms, reward.PreHash, reward.DonateBlock)}).Result()
-	_, err = tx.Exec(ctx)
+	tx.Del(ctx, r.formatKey("submit", reward.PreHash)).Result()
+	_, err := tx.Exec(ctx)
 	return err
 }
 
-func (r *KvClient) SetLostReward(login string, reward pool.XdagjReward, ms, ts int64) {
-	_, err := r.client.SMove(ctx, r.formatKey("waiting"), r.formatKey("lost"), reward.PreHash).Result()
-	if err != nil {
-		util.Error.Println("store lost set error", reward.PreHash, err)
-	}
-}
+// func (r *KvClient) SetLostReward(login string, reward pool.XdagjReward, ms, ts int64) {
+// 	_, err := r.client.SMove(ctx, r.formatKey("waiting"), r.formatKey("lost"), reward.PreHash).Result()
+// 	if err != nil {
+// 		util.Error.Println("store lost set error", reward.PreHash, err)
+// 	}
+// }
 
 func (r *KvClient) SetPayment(login, txHash, remark string, payment float64, ms, ts int64) error {
 	tx := r.client.TxPipeline()
@@ -242,6 +248,10 @@ func (r *KvClient) IsMinShare(jobHash, login, share string, shareU64 uint64) boo
 		tx := r.client.TxPipeline()
 		tx.SAdd(ctx, r.formatKey("submit", jobHash), share) //store submitted share
 		tx.ZAdd(ctx, r.formatKey("mini", jobHash), redis.Z{Score: float64(shareU64), Member: login})
+		if len(z) == 0 {
+			tx.Expire(ctx, r.formatKey("submit", jobHash), taskDuration)
+			tx.Expire(ctx, r.formatKey("mini", jobHash), taskDuration)
+		}
 		_, err := tx.Exec(ctx)
 		if err != nil {
 			util.Error.Println("store submitted min share error", err)
@@ -289,7 +299,7 @@ func (r *KvClient) GetMinersToPay(threshold int64) map[string]int64 {
 // get all miners and their diff proportion  which participated in a job
 func (r *KvClient) GetProportion(jobHash string) map[string]float64 {
 	miners := make(map[string]float64)
-	poolDiff, _ := r.client.HGet(ctx, r.formatKey("pool", "diff"), jobHash).Int64()
+	poolDiff, _ := r.client.HGet(ctx, r.formatKey("pool", jobHash), "diff").Int64()
 	fields, err := r.client.HKeys(ctx, r.formatKey("job", jobHash)).Result()
 	if err != nil {
 		util.Error.Println("get miners diff error", err)
@@ -408,4 +418,114 @@ func join(args ...interface{}) string {
 		}
 	}
 	return strings.Join(s, ":")
+}
+
+func (r *KvClient) PurgeRecords(window time.Duration) (int64, error) {
+	now := util.MakeTimestamp() / 1000
+	max := fmt.Sprint("(", now-int64(window/time.Second))
+	total, err := r.client.ZRemRangeByScore(ctx, r.formatKey("pool", "donate"), "-inf", max).Result()
+	if err != nil {
+		return total, err
+	}
+
+	n, err := r.client.ZRemRangeByScore(ctx, r.formatKey("pool", "rewards"), "-inf", max).Result()
+	if err != nil {
+		return total, err
+	}
+	total += n
+
+	n, err = r.client.ZRemRangeByScore(ctx, r.formatKey("rejecthashrate"), "-inf", max).Result()
+	if err != nil {
+		return total, err
+	}
+	total += n
+
+	n, err = r.client.ZRemRangeByScore(ctx, r.formatKey("invalidhashrate"), "-inf", max).Result()
+	if err != nil {
+		return total, err
+	}
+	total += n
+
+	var c uint64
+
+	max = fmt.Sprint("(", now-int64(window/time.Second))
+
+	for {
+		miners := make(map[string]struct{})
+		var keys []string
+		var err error
+		keys, c, err = r.client.Scan(ctx, c, r.formatKey("balance", "*"), 100).Result()
+		if err != nil {
+			util.Error.Println("purge balance scan", err.Error())
+			break
+		}
+		for _, row := range keys {
+			login := strings.Split(row, ":")[2]
+			if _, ok := miners[login]; !ok {
+				n, err := r.client.ZRemRangeByScore(ctx, r.formatKey("balance", login), "-inf", max).Result()
+				if err != nil {
+					util.Error.Println("purge: balance remove", err.Error(), login)
+					break
+				}
+				miners[login] = struct{}{}
+				total += n
+			}
+		}
+		if c == 0 {
+			break
+		}
+	}
+
+	for {
+		miners := make(map[string]struct{})
+		var keys []string
+		var err error
+		keys, c, err = r.client.Scan(ctx, c, r.formatKey("rewards", "*"), 100).Result()
+		if err != nil {
+			util.Error.Println("purge rewards scan", err.Error())
+			break
+		}
+		for _, row := range keys {
+			login := strings.Split(row, ":")[2]
+			if _, ok := miners[login]; !ok {
+				n, err := r.client.ZRemRangeByScore(ctx, r.formatKey("rewards", login), "-inf", max).Result()
+				if err != nil {
+					util.Error.Println("purge: rewards remove", err.Error(), login)
+					break
+				}
+				miners[login] = struct{}{}
+				total += n
+			}
+		}
+		if c == 0 {
+			break
+		}
+	}
+
+	for {
+		miners := make(map[string]struct{})
+		var keys []string
+		var err error
+		keys, c, err = r.client.Scan(ctx, c, r.formatKey("payment", "*"), 100).Result()
+		if err != nil {
+			util.Error.Println("purge payment scan", err.Error())
+			return total, err
+		}
+		for _, row := range keys {
+			login := strings.Split(row, ":")[2]
+			if _, ok := miners[login]; !ok {
+				n, err := r.client.ZRemRangeByScore(ctx, r.formatKey("payment", login), "-inf", max).Result()
+				if err != nil {
+					util.Error.Println("purge: payment remove", err.Error(), login)
+					return total, err
+				}
+				miners[login] = struct{}{}
+				total += n
+			}
+		}
+		if c == 0 {
+			break
+		}
+	}
+	return total, nil
 }

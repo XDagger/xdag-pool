@@ -29,9 +29,10 @@ func ProcessReward(cfg *pool.Config, backend *kvstore.KvClient, reward pool.Xdag
 
 	// is the reward's share submitted by this pool?
 	if !backend.IsPoolShare(reward.PreHash, reward.Share) {
-		backend.SetLostReward(login, reward, ms, ts)
+		// backend.SetLostReward(login, reward, ms, ts)
 		return
 	}
+
 	err = backend.SetWinReward(login, reward, ms, ts)
 	if err != nil {
 		util.Error.Println("store win set error", err)
