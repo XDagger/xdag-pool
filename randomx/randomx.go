@@ -2,6 +2,7 @@ package randomx
 
 //#cgo CFLAGS: -I../clib/randomx/src
 //#cgo linux,amd64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Linux -lm -lstdc++
+//#cgo linux,arm LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Linux -lm -lstdc++
 //#cgo darwin,amd64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Darwin -lm -lstdc++
 //#cgo darwin,arm64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Darwin -lm -lstdc++
 //#cgo windows,amd64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Windows -lm -lstdc++
