@@ -15,7 +15,7 @@ import (
 
 var ctx = context.Background()
 
-const taskDuration = 20 * time.Minute
+const expireDuration = 30 * time.Minute
 
 type KvClient struct {
 	client *redis.Client
@@ -83,7 +83,7 @@ func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint
 	ts := ms / 1000
 
 	// r.writeShare(tx, ms, ts, login, id, diff, window)
-	tx.HSet(ctx, r.formatKey("works", login+"."+id), "lastShare", strconv.FormatInt(ts, 10))
+	tx.HSet(ctx, r.formatKey("workers", login+"."+id), "lastShare", strconv.FormatInt(ts, 10))
 	tx.HSet(ctx, r.formatKey("miners", login), "lastShare", strconv.FormatInt(ts, 10))
 	tx.HSet(ctx, r.formatKey("stats"), "lastShare", strconv.FormatInt(ts, 10))
 	// tx.HDel(ctx, r.formatKey("stats"), "roundShares")
@@ -94,8 +94,8 @@ func (r *KvClient) WriteBlock(login, id, share string, diff int64, shareU64 uint
 	// tx.HGetAll(ctx, r.formatRound(int64(height), params[0]))
 	tx.HIncrBy(ctx, r.formatKey("pool", jobHash), "diff", diff) // accumulate pool diff of the job
 	tx.HIncrBy(ctx, r.formatKey("job", jobHash), login, diff)   // accumulate miners diff of the job (identified by job hash)
-	tx.Expire(ctx, r.formatKey("job", jobHash), taskDuration)
-	tx.Expire(ctx, r.formatKey("pool", jobHash), taskDuration)
+	tx.Expire(ctx, r.formatKey("job", jobHash), expireDuration)
+	tx.Expire(ctx, r.formatKey("pool", jobHash), expireDuration)
 	// cmds, err := tx.Exec(ctx)
 	_, err := tx.Exec(ctx)
 	if err != nil {
@@ -249,8 +249,8 @@ func (r *KvClient) IsMinShare(jobHash, login, share string, shareU64 uint64) boo
 		tx.SAdd(ctx, r.formatKey("submit", jobHash), share) //store submitted share
 		tx.ZAdd(ctx, r.formatKey("mini", jobHash), redis.Z{Score: float64(shareU64), Member: login})
 		if len(z) == 0 {
-			tx.Expire(ctx, r.formatKey("submit", jobHash), taskDuration)
-			tx.Expire(ctx, r.formatKey("mini", jobHash), taskDuration)
+			tx.Expire(ctx, r.formatKey("submit", jobHash), expireDuration)
+			tx.Expire(ctx, r.formatKey("mini", jobHash), expireDuration)
 		}
 		_, err := tx.Exec(ctx)
 		if err != nil {

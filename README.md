@@ -33,10 +33,17 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
   "addressEncrypted": "G6LLHMvWi6HiysT+PuCWXhuaTWOxbHlEocNf5ilWAy+e7KsjAGPVOu1PBgIxxeFD",
   "threads": 4,
 
+  //hashrate estimation
   "estimationWindow": "15m",
   "luckWindow": "24h",
+
+  // purge stale kv store data
+  "purgeInterval": "3h",
+	"purgeWindow": "30d",
+
   // randomx mode: fast(3G ram), light(300M ram)
   "rx_mode":"fast",
+  
   //AES encrypted wallet password by pool key
   "walletEncrypted": "9FilIh6x3WdWaC74YGg3qw==",
   "stratum": {
