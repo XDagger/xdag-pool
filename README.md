@@ -37,9 +37,9 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
   "estimationWindow": "15m",
   "luckWindow": "24h",
 
-  // purge stale kv store data
+  // purge stale kv store data, remain recent 30 days data
   "purgeInterval": "3h",
-	"purgeWindow": "30d",
+	"purgeWindow": "720h",
 
   // randomx mode: fast(3G ram), light(300M ram)
   "rx_mode":"fast",
@@ -94,6 +94,12 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 You must use ``<address>.WorkerID`` as username in your miner. If there is no workerID specified your rig stats will be merged under `0` worker. 
 
 Copy your wallet data folder ``xdagj_wallet`` to pool path.
+
+To skip password input, modify code pool/pool.go and put your pool key in the code.
+
+```
+const PoolKey = "12345678" // it can make pool boot/reboot without interfering.
+```
 
 ## RPC
 
