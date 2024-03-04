@@ -21,7 +21,18 @@ Dependencies:
   * go-1.20
   * RandomX
 
+## Encrypt tool
 
+### build
+```
+$> cd tools
+$> go build ./encrypt.go
+```
+
+### usage
+```
+./encrypt [-h] [-p pool password] [-a address] [-w wallet password] [-k kv store password]
+```
 ## Configuration
 
 Configuration is self-describing, just copy *config.example.json* to *config.json* and run stratum with path to config file as 1st argument.
