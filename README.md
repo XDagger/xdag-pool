@@ -117,7 +117,7 @@ const PoolKey = "12345678" // it can make pool boot/reboot without interfering.
 ### xdag_poolConfig
 #### request
 ```
-curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data "{"jsonrpc":"2.0","method":"xdag_poolConfig","params":[],"id":1}"
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"xdag_poolConfig","params":[],"id":1}'
 ```
 
 #### response
@@ -131,7 +131,7 @@ poolRewardRation":"5.0","poolDirectRation":"5.0","poolFundRation":"0.0","thresho
 ### xdag_updatePoolConfig
 #### request
 ```
-curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data "{"jsonrpc":"2.0","method":"xdag_updatePoolConfig","params":[{"poolFeeRation":"4","poolRewardRation":"4","poolDirectRation":"4","threshold":"4"},"pool_password"],"id":1}"
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"xdag_updatePoolConfig","params":[{"poolFeeRation":"4","poolRewardRation":"4","poolDirectRation":"4","threshold":"4"},"pool_password"],"id":1}'
 ```
 #### response
 ```
@@ -142,7 +142,7 @@ curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --
 #### request
 ```
 curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data
-"{"jsonrpc":"2.0","method":"xdag_getPoolWorkers","params":[],"id":1}"
+'{"jsonrpc":"2.0","method":"xdag_getPoolWorkers","params":[],"id":1}'
 ```
 
 #### response
