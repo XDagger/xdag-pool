@@ -3,21 +3,23 @@ package stratum
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"math/big"
+	"encoding/json"
 
-	"github.com/XDagger/xdagpool/base58"
+	"github.com/XDagger/xdagpool/pool"
+	"github.com/XDagger/xdagpool/randomx"
 	"github.com/XDagger/xdagpool/util"
+	"github.com/XDagger/xdagpool/xdago/base58"
 )
 
 type BlockTemplate struct {
-	diffInt64  int64
-	height     int64
-	timestamp  uint64
-	difficulty *big.Int
-	// reservedOffset int
-	jobHash  string
-	buffer   []byte
-	seedHash []byte
+	// diffInt64 int64
+	// height     int64
+	timestamp uint64
+	// difficulty *big.Int
+	taskIndex int
+	jobHash   string
+	buffer    []byte
+	seedHash  []byte
 
 	// blockReward  int64
 	// txTotalFee   int64
@@ -25,7 +27,7 @@ type BlockTemplate struct {
 }
 
 func (b *BlockTemplate) nextBlob(address string, extraNonce uint32, instanceId []byte) string {
-	// 32 bytes (reserved) = 24 bytes (wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId)
+	// 32 bytes (reserved) = 20 bytes (pool owner wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId) + 4bytes (share nonce)
 	blobBuff := make([]byte, len(b.buffer)*2)
 
 	copy(blobBuff, b.buffer)
@@ -42,16 +44,17 @@ func (b *BlockTemplate) nextBlob(address string, extraNonce uint32, instanceId [
 	return hex.EncodeToString(blobBuff)
 }
 
-func (s *StratumServer) fetchBlockTemplate() bool {
-	r := s.rpc()
-	reply, err := r.GetBlockTemplate(8, s.config.Address)
+func (s *StratumServer) fetchBlockTemplate(msg json.RawMessage) bool {
+	var reply pool.XdagjTask
+	err := json.Unmarshal(msg, &reply)
+
 	if err != nil {
 		util.Error.Printf("Error while refreshing block template: %s", err)
 		return false
 	}
 	t := s.currentBlockTemplate()
 
-	if t != nil && t.jobHash == reply.Blob {
+	if t != nil && t.jobHash == reply.Data.PreHash {
 		// // Fallback to height comparison
 		// if len(reply.PrevHash) == 0 && reply.Height > t.height {
 		// 	util.Info.Printf("New block to mine on %s at height %v, timestamp: %v", r.Name, reply.Height, reply.Timestamp)
@@ -59,18 +62,29 @@ func (s *StratumServer) fetchBlockTemplate() bool {
 		return false
 		// }
 	} else {
-		util.Info.Printf("New block to mine on %s at height %v, diff: %v, timestamp: %v", r.Name, reply.Height, reply.Difficulty, reply.Timestamp)
+		util.Info.Printf("New block to mine on %s at jobHash %s,  timestamp: %v", s.config.NodeName, reply.Data.PreHash, reply.Timestamp)
 	}
+	// s.backend.AddWaiting(reply.Data.PreHash)
+
 	newTemplate := BlockTemplate{
-		diffInt64:  reply.Difficulty,
-		difficulty: big.NewInt(reply.Difficulty),
-		height:     reply.Height,
-		jobHash:    reply.Blob,
-		timestamp:  reply.Timestamp,
+		// diffInt64:  reply.Difficulty,
+		// difficulty: big.NewInt(reply.Difficulty),
+		// height:     reply.Height,
+		jobHash:   reply.Data.PreHash,
+		timestamp: reply.Timestamp,
+		taskIndex: reply.Index,
 		// reservedOffset: reply.ReservedOffset,
 	}
-	newTemplate.seedHash, _ = hex.DecodeString(reply.SeedHash)
-	newTemplate.buffer, _ = hex.DecodeString(reply.Blob)
+	newTemplate.seedHash, _ = hex.DecodeString(reply.Data.TashSeed)
+	newTemplate.buffer, _ = hex.DecodeString(reply.Data.PreHash)
+
+	if t == nil || reply.Data.TashSeed != hex.EncodeToString(t.seedHash) {
+		if s.config.RxMode == "fast" {
+			randomx.Rx.NewSeed(newTemplate.seedHash)
+		} else {
+			randomx.Rx.NewSeedSlow(newTemplate.seedHash)
+		}
+	}
 	// newTemplate.nextSeedHash, _ = hex.DecodeString(reply.NextSeedHash)
 
 	// // set blockReward and txTotalFee

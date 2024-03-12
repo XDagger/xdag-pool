@@ -41,11 +41,12 @@ func decryptAES(src []byte, key []byte) ([]byte, error) {
 	return src, nil
 }
 
+// MODE: CBC, Key Size: 128bits, IV and Secret Key: 16 characters long( add '*' if length not enough)
 func Ae64Encode(src []byte, key []byte) (string, error) {
 	if len(key) <= 16 {
 		paddingCount := 16 - len(key)
 		for i := 0; i < paddingCount; i++ {
-			key = append(key, byte(' '))
+			key = append(key, byte('*'))
 		}
 	} else {
 		key = key[0:16]
@@ -62,7 +63,7 @@ func Ae64Decode(str string, key []byte) ([]byte, error) {
 	if len(key) <= 16 {
 		paddingCount := 16 - len(key)
 		for i := 0; i < paddingCount; i++ {
-			key = append(key, byte(' '))
+			key = append(key, byte('*'))
 		}
 	} else {
 		key = key[0:16]

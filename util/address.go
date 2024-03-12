@@ -1,6 +1,8 @@
 package util
 
-import "github.com/XDagger/xdagpool/base58"
+import (
+	"github.com/XDagger/xdagpool/xdago/base58"
+)
 
 func ValidateAddress(address string) bool {
 	_, _, err := base58.ChkDec(address)
@@ -11,3 +13,17 @@ func ValidateAddress(address string) bool {
 // func ConvertBlob(blob []byte) []byte {
 // 	return blob
 // }
+
+func ValidatePasswd(encrypted, pswd string) bool {
+	b, err := Ae64Decode(encrypted, []byte(pswd))
+	if err != nil {
+		return false
+	}
+
+	// check address
+	if !ValidateAddress(string(b)) {
+		return false
+	}
+
+	return true
+}

@@ -2,8 +2,10 @@ package randomx
 
 //#cgo CFLAGS: -I../clib/randomx/src
 //#cgo linux,amd64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Linux -lm -lstdc++
+//#cgo linux,arm LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Linux -lm -lstdc++
 //#cgo darwin,amd64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Darwin -lm -lstdc++
-//#cgo windows,amd64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Windows -static -static-libgcc -static-libstdc++
+//#cgo darwin,arm64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Darwin -lm -lstdc++
+//#cgo windows,amd64 LDFLAGS:-L${SRCDIR}/../clib -lrandomx_Windows -lm -lstdc++
 //#include <stdlib.h>
 //#include "randomx.h"
 import "C"
@@ -12,6 +14,7 @@ import (
 	"unsafe"
 )
 
+// -static -static-libgcc -static-libstdc++
 const RxHashSize = C.RANDOMX_HASH_SIZE
 
 // All flags
@@ -134,7 +137,10 @@ func SetVMDataset(vm VM, dataset Dataset) {
 }
 
 func DestroyVM(vm VM) {
-	C.randomx_destroy_vm(vm)
+	if vm != nil {
+		C.randomx_destroy_vm(vm)
+	}
+
 }
 
 func CalculateHash(vm VM, in []byte) []byte {

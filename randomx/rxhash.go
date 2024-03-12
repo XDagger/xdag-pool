@@ -54,18 +54,24 @@ func (h *RxHash) NewSeed(seed []byte) {
 	wg.Wait()
 
 	vm, _ := CreateVM(h.Cache, h.Dataset, flags, FlagFullMEM)
+	DestroyVM(h.Vm)
 	h.Vm = vm
 }
 
 func (h *RxHash) NewSeedSlow(seed []byte) {
 	h.Lock()
 	defer h.Unlock()
+	if h.CurrentSeed == hex.EncodeToString(seed) {
+		return
+	}
+
 	h.LastSeed = h.CurrentSeed
 	h.CurrentSeed = hex.EncodeToString(seed)
 	flags := GetFlags()
 	InitCache(h.Cache, seed)
 
 	vm, _ := CreateVM(h.Cache, nil, flags)
+	DestroyVM(h.Vm)
 	h.Vm = vm
 }
 

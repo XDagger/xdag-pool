@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-var SHARD_COUNT = 32
+var SHARD_COUNT = 256
 
 // TODO: Add Keys function which returns an array of keys for the map.
 
@@ -31,7 +31,7 @@ func NewMinersMap() MinersMap {
 func (m MinersMap) GetShard(key string) *MinersMapShared {
 	hasher := fnv.New32()
 	_, _ = hasher.Write([]byte(key))
-	return m[int(hasher.Sum32())%SHARD_COUNT]
+	return m[hasher.Sum32()%uint32(SHARD_COUNT)]
 }
 
 // Sets the given value under the specified key.

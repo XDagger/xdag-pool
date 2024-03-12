@@ -8,8 +8,8 @@ High performance xdag mining stratum with Web-interface written in Golang.
 * Rigs availability monitoring
 * Keep track of accepts, rejects, blocks stats
 * Easy detection of sick rigs
-* Daemon failover list
 * Concurrent shares processing
+* config encrypted by pool password
 * Beautiful Web-interface
 
 ![](screenshot.png)
@@ -21,123 +21,51 @@ Dependencies:
   * go-1.20
   * RandomX
 
+## Encrypt tool
 
-<!-- ### Linux
+### build
+```
+$> cd tools
+$> go build ./encrypt.go
+```
 
-Use Ubuntu 16.04 LTS.
-
-    sudo apt-get install libssl-dev
-    sudo apt-get install git cmake build-essential pkg-config libboost-all-dev libreadline-dev doxygen libsodium-dev libzmq5-dev
-    sudo apt-get install liblmdb-dev libevent-dev libjson-c-dev uuid-dev
-
-Use Ubuntu 18.04 LTS.
-
-    sudo apt-get install libssl1.0-dev
-    sudo apt-get install git cmake build-essential pkg-config libboost-all-dev libreadline-dev doxygen libsodium-dev libzmq5-dev 
-    sudo apt-get install liblmdb-dev libevent-dev libjson-c-dev uuid-dev
-
-
-Compile Monero source (with shared libraries option):
-
-    git clone --recursive https://github.com/monero-project/monero.git
-    cd monero
-    git checkout tags/v0.17.0.0 -b v0.17.0.0
-    cmake -DBUILD_SHARED_LIBS=1 -DMANUAL_SUBMODULES=1 .
-    make
-
-Install Golang and required packages:
-
-    sudo apt install software-properties-common
-    sudo add-apt-repository ppa:longsleep/golang-backports
-    sudo apt-get update
-    sudo apt-get install golang-go
-
-Clone:
-
-    git clone https://github.com/XDagger/xdagpool.git
-    cd xmrpool
-
-Build stratum:
-
-    export MONERO_DIR=[path_of_monero] 
-    cmake .
-    make
-    make -f Makefile_build_info
-
-`MONERO_DIR=/path/to/monero` is optional, not needed if both `monero` and `xmrpool` is in the same directory like `/opt/src/`. By default make will search for monero libraries in `../monero`. You can just run `cmake .`.
-
-### Mac OS X
-
-Compile Monero source:
-
-    git clone --recursive https://github.com/monero-project/monero.git
-    cd monero
-    git checkout tags/v0.17.0.0 -b v0.17.0.0
-    cmake .
-    make
-
-Install Golang and required packages:
-
-    brew update && brew install go
-
-Clone stratum:
-
-    git clone https://github.com/XDagger/xdagpool.git
-    cd xmrpool
-
-Build stratum:
-
-    MONERO_DIR=[path_of_monero]  
-    cmake .
-    make
-    make -f Makefile_build_info
-
-### Running Stratum
-
-    ./build/bin/xmrpool config.json
-
-If you need to bind to privileged ports and don't want to run from `root`:
-
-    sudo apt-get install libcap2-bin
-    sudo setcap 'cap_net_bind_service=+ep' /path/to/xmrpool -->
-
+### usage
+```
+./encrypt [-h] [-p pool password] [-a address] [-w wallet password] [-k kv store password]
+```
 ## Configuration
 
 Configuration is self-describing, just copy *config.example.json* to *config.json* and run stratum with path to config file as 1st argument.
 
 ```javascript
 {
-  // Address for block rewards
-  "address": "YOUR-ADDRESS-NOT-EXCHANGE",
-  // Don't validate address
-  "bypassAddressValidation": true,
-  // Don't validate shares
-  "bypassShareValidation": true,
+  // Pool Address for rewards, pool key: 12345678
+  // AES: CBC, Key Size: 128bits, IV and Secret Key: 16 characters long( add '*' if length not enough)
+  "addressEncrypted": "G6LLHMvWi6HiysT+PuCWXhuaTWOxbHlEocNf5ilWAy+e7KsjAGPVOu1PBgIxxeFD",
+  "threads": 4,
 
-  "threads": 2,
-
+  //hashrate estimation
   "estimationWindow": "15m",
   "luckWindow": "24h",
-  "largeLuckWindow": "72h",
 
-  // Interval to poll daemon for new jobs
-  "blockRefreshInterval": "1s",
+  // purge stale kv store data, remain recent 30 days data
+  "purgeInterval": "3h",
+	"purgeWindow": "720h",
 
+  // randomx mode: fast(3G ram), light(300M ram)
+  "rx_mode":"fast",
+  
+  //AES encrypted wallet password by pool key
+  "walletEncrypted": "9FilIh6x3WdWaC74YGg3qw==",
   "stratum": {
     // Socket timeout
-    "timeout": "15m",
+    "timeout": "2m",
 
     "listen": [
       {
         "host": "0.0.0.0",
         "port": 1111,
-        "diff": 5000,
-        "maxConn": 32768
-      },
-      {
-        "host": "0.0.0.0",
-        "port": 3333,
-        "diff": 10000,
+        "diff": 20000,
         "maxConn": 32768
       }
     ]
@@ -151,31 +79,91 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
     "hideIP": false
   },
 
-  "upstreamCheckInterval": "5s",
+  "kvrocks": {
+		"endpoint": "127.0.0.1:6379",
+		"poolSize": 10,
+		"database": 0,
+    //123456
+		"passwordEncrypted": "MbRmWtAs7GA2E1B6ioBSoQ=="
+	},
 
-  "upstream": [
-    {
-      "name": "Main",
-      "host": "127.0.0.1",
-      "port": 18081,
-      "timeout": "10s"
-    }
-  ]
-}
+	"payout": {
+		"poolRation": 5.0,
+		"rewardRation": 5.0,
+		"directRation": 5.0,
+    // threshhold to pay miner
+		"threshold": 3,
+		"paymentInterval": "10m",
+    // solo or equal
+		"mode": "equal",
+		"paymentRemark": "http://mypool.com"
+	}
+
+ }
 ```
 
-You must use `anything.WorkerID` as username in your miner. Either disable address validation or use `<address>.WorkerID` as username. If there is no workerID specified your rig stats will be merged under `0` worker. If mining software contains dev fee rounds its stats will usually appear under `0` worker. This stratum acts like your own pool, the only exception is that you will get rewarded only after block found, shares only used for stats.
+You must use ``<address>.WorkerID`` as username in your miner. If there is no workerID specified your rig stats will be merged under `0` worker. 
 
-<!-- ### Donations
+Copy your wallet data folder ``xdagj_wallet`` to pool path.
 
-**XMR**: `47v4BWeUPFrM9YkYRYk2pkS9CubAPEc7BJjNjg4FvF66Y2oVrTAaBjDZhmFzAXgqCNRvBH2gupQ2gNag2FkP983ZMptvUWG`
+To skip password input, modify code pool/pool.go and put your pool key in the code.
 
-![](https://cdn.pbrd.co/images/GP5tI1D.png)
+```
+const PoolKey = "12345678" // it can make pool boot/reboot without interfering.
+```
 
-Highly appreciated.
+## RPC
 
-### License
+### xdag_poolConfig
+#### request
+```
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"xdag_poolConfig","params":[],"id":1}'
+```
 
-Released under the GNU General Public License v2.
+#### response
+```
+{"jsonrpc":"2.0","id":1,"result":
+{"poolIp":"127.0.0.1","poolPort":7001,"nodeIp":"127.0.0.1","nodePort":8001,"globalMiner
+Limit":8192,"maxConnectMinerPerIp":256,"maxMinerPerAccount":256,"poolFeeRation":"5.0","
+poolRewardRation":"5.0","poolDirectRation":"5.0","poolFundRation":"0.0","threshold":"3"}}
+```
 
-http://www.gnu.org/licenses/gpl-2.0.html -->
+### xdag_updatePoolConfig
+#### request
+```
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"xdag_updatePoolConfig","params":[{"poolFeeRation":"4","poolRewardRation":"4","poolDirectRation":"4","threshold":"4"},"pool_password"],"id":1}'
+```
+#### response
+```
+{"jsonrpc":"2.0","id":1,"result":"Success"}
+```
+
+### xdag_getPoolWorkers
+#### request
+```
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data
+'{"jsonrpc":"2.0","method":"xdag_getPoolWorkers","params":[],"id":1}'
+```
+
+#### response
+```
+json {"jsonrpc":"2.0","id":1,"result":
+[{"address":"pCuGwAx/THicdSMFiy7vPgixsSP9AVRQ","status":"fee","unpaidShares":0.0,"hashr
+ate":2.2551405187698493E-18,"workers":[]},
+{"address":"oJA3+RpvYRb0eJKdUo38XTxLRhqircNa","status":"MINER_ACTIVE","unpaidShares":0.
+02088520508135681,"hashrate":3.9752369225781053E-4,"workers":
+[{"address":"172.31.100.234:48466","inBound":145,"outBound":438,"unpaidShares":0.020885
+20508135681,"name":"wb1","hashrate":3.9752369225781053E-4}]},
+{"address":"3oQtj/YtlIl8PGNWtqFR0QNo0dXJ+FDq","status":"MINER_ACTIVE","unpaidShares":1.
+5918582804382894E-8,"hashrate":2.8651250602006866E-8,"workers":
+[{"address":"172.31.100.234:53154","inBound":201,"outBound":260,"unpaidShares":1.591858
+2804382894E-8,"name":"", "hashrate":2.8651250602006866E-8}]},
+{"address":"jWx51h049qtJH68Zd0buxwW5xPML4GZR","status":"MINER_ACTIVE","unpaidShares":4.
+186463512272553E-4,"hashrate":0.0012218697372245008,"workers":
+[{"address":"172.31.100.234:48488","inBound":108,"outBound":327,"unpaidShares":1.893309
+5261087333E-4,"name":"wb2","hashrate":5.014658633706342E-4}
+{"address":"172.31.100.234:48490","inBound":89,"outBound":295,"unpaidShares":4.18646351
+2272553E-4,"name":"wb3","hashrate":3.704957506989368E-4},
+{"address":"172.31.100.234:48492","inBound":102,"outBound":295,"unpaidShares":1.6494257
+81936861E-4,"name":"wb4","hashrate":2.4399312515244604E-4}]}]}
+```

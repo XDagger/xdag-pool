@@ -18,6 +18,12 @@ func TestGetTargetHex(t *testing.T) {
 	if targetHex != expectedHex {
 		t.Error("Invalid targetHex")
 	}
+
+	targetHex = GetTargetHex(300000)
+	fmt.Println(targetHex)
+
+	targetHex = GetTargetHex(50000)
+	fmt.Println(targetHex)
 }
 
 func TestGetHashDifficulty(t *testing.T) {

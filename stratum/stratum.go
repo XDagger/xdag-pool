@@ -17,32 +17,29 @@ import (
 	"github.com/XDagger/xdagpool/kvstore"
 
 	"github.com/XDagger/xdagpool/pool"
-	"github.com/XDagger/xdagpool/rpc"
 	"github.com/XDagger/xdagpool/util"
-	. "github.com/XDagger/xdagpool/util"
 )
 
 type StratumServer struct {
-	luckWindow          int64
-	luckLargeWindow     int64
-	roundShares         int64
-	blockStats          map[int64]blockEntry
-	config              *pool.Config
-	miners              MinersMap
-	blockTemplate       atomic.Value
-	upstream            int32
-	upstreams           []*rpc.RPCClient
-	timeout             time.Duration
-	estimationWindow    time.Duration
-	hashrateWindow      time.Duration
-	hashrateLargeWindow time.Duration
+	luckWindow int64
+	// luckLargeWindow int64
+	roundShares   int64
+	blockStats    map[int64]blockEntry
+	config        *pool.Config
+	miners        MinersMap
+	workers       WorkersMap
+	blockTemplate atomic.Value
+	// upWsClient          *ws.Socket
+	timeout          time.Duration
+	estimationWindow time.Duration
+	purgeWindow      time.Duration
+	// purgeLargeWindow time.Duration
 
 	blocksMu   sync.RWMutex
 	sessionsMu sync.RWMutex
 	sessions   map[*Session]struct{}
 
-	backend            *kvstore.KvClient
-	hashrateExpiration time.Duration
+	backend *kvstore.KvClient
 
 	upstreamsStates []bool
 
@@ -75,7 +72,7 @@ type Session struct {
 	ip  string
 
 	login   string
-	address []byte
+	address string
 	id      string
 	uid     string
 
@@ -87,23 +84,15 @@ const (
 	MaxReqSize = 10 * 1024
 )
 
-func NewStratum(cfg *pool.Config, backend *kvstore.KvClient) *StratumServer {
+func NewStratum(cfg *pool.Config, backend *kvstore.KvClient, msgChan chan pool.Message) *StratumServer {
 	stratum := &StratumServer{config: cfg, backend: backend, blockStats: make(map[int64]blockEntry),
 		maxConcurrency: cfg.Threads}
 
-	stratum.upstreams = make([]*rpc.RPCClient, len(cfg.Upstream))
-	for i, v := range cfg.Upstream {
-		client, err := rpc.NewRPCClient(&v)
-		if err != nil {
-			Error.Fatal(err)
-		} else {
-			stratum.upstreams[i] = client
-			Info.Printf("Upstream: %s => %s", client.Name, client.Url)
-		}
-	}
-	Info.Printf("Default upstream: %s => %s", stratum.rpc().Name, stratum.rpc().Url)
+	// stratum.upWsClient = ws.NewRpcClient(cfg.NodeWs, cfg.WsSsl)
+	// util.Info.Printf("Upstream ws: %s => %s", cfg.NodeName, cfg.NodeWs)
 
 	stratum.miners = NewMinersMap()
+	stratum.workers = NewWorkersMap()
 	stratum.sessions = make(map[*Session]struct{})
 
 	timeout, _ := time.ParseDuration(cfg.Stratum.Timeout)
@@ -112,48 +101,20 @@ func NewStratum(cfg *pool.Config, backend *kvstore.KvClient) *StratumServer {
 	estimationWindow, _ := time.ParseDuration(cfg.EstimationWindow)
 	stratum.estimationWindow = estimationWindow
 
-	hashrateExpiration, _ := time.ParseDuration(cfg.HashRateExpiration)
-	stratum.hashrateExpiration = hashrateExpiration
+	purgeWindow, _ := time.ParseDuration(cfg.PurgeWindow)
+	stratum.purgeWindow = purgeWindow
 
-	hashrateWindow, _ := time.ParseDuration(cfg.HashrateWindow)
-	stratum.hashrateWindow = hashrateWindow
-
-	hashrateLargeWindow, _ := time.ParseDuration(cfg.HashrateLargeWindow)
-	stratum.hashrateLargeWindow = hashrateLargeWindow
+	// purgeLargeWindow, _ := time.ParseDuration(cfg.PurgeLargeWindow)
+	// stratum.purgeLargeWindow = purgeLargeWindow
 
 	luckWindow, _ := time.ParseDuration(cfg.LuckWindow)
 	stratum.luckWindow = int64(luckWindow / time.Millisecond)
-	luckLargeWindow, _ := time.ParseDuration(cfg.LargeLuckWindow)
-	stratum.luckLargeWindow = int64(luckLargeWindow / time.Millisecond)
+	// luckLargeWindow, _ := time.ParseDuration(cfg.LargeLuckWindow)
+	// stratum.luckLargeWindow = int64(luckLargeWindow / time.Millisecond)
 
-	refreshIntv, _ := time.ParseDuration(cfg.BlockRefreshInterval)
-	refreshTimer := time.NewTimer(refreshIntv)
-	Info.Printf("Set block refresh every %v", refreshIntv)
-
-	purgeIntv := MustParseDuration(cfg.PurgeInterval)
+	purgeIntv := util.MustParseDuration(cfg.PurgeInterval)
 	purgeTimer := time.NewTimer(purgeIntv)
-	Info.Printf("Set purge interval to %v", purgeIntv)
-
-	checkIntv, _ := time.ParseDuration(cfg.UpstreamCheckInterval)
-	checkTimer := time.NewTimer(checkIntv)
-	Info.Printf("Set check interval to %v", checkIntv)
-
-	//infoIntv, _ := time.ParseDuration(cfg.UpstreamCheckInterval)
-	//infoTimer := time.NewTimer(infoIntv)
-	//Info.Printf("Set info interval to %v", infoIntv)
-
-	// Init block template
-	go stratum.refreshBlockTemplate(false)
-
-	go func() {
-		for {
-			select {
-			case <-refreshTimer.C:
-				stratum.refreshBlockTemplate(true)
-				refreshTimer.Reset(refreshIntv)
-			}
-		}
-	}()
+	util.Info.Printf("Set purge interval to %v", purgeIntv)
 
 	// purge stale
 	go func() {
@@ -166,41 +127,15 @@ func NewStratum(cfg *pool.Config, backend *kvstore.KvClient) *StratumServer {
 		}
 	}()
 
-	go func() {
-		for {
-			select {
-			case <-checkTimer.C:
-				stratum.checkUpstreams()
-				checkTimer.Reset(checkIntv)
+	go func(c chan pool.Message) {
+		for m := range c {
+			if m.MsgType == 1 { // task
+				stratum.refreshBlockTemplate(m.MsgContent)
+			} else if m.MsgType == 3 { // rewards
+				stratum.processRewards(m.MsgContent)
 			}
 		}
-	}()
-
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-infoTimer.C:
-	//			poll := func(v *rpc.RPCClient) {
-	//				_, err := v.UpdateInfo()
-	//				if err != nil {
-	//					Error.Printf("Unable to update info on upstream %s: %v", v.Name, err)
-	//				}
-	//			}
-	//			current := stratum.rpc()
-	//			poll(current)
-	//
-	//			// Async rpc call to not block on rpc timeout, ignoring current
-	//			go func() {
-	//				for _, v := range stratum.upstreams {
-	//					if v != current {
-	//						poll(v)
-	//					}
-	//				}
-	//			}()
-	//			infoTimer.Reset(infoIntv)
-	//		}
-	//	}
-	//}()
+	}(msgChan)
 
 	return stratum
 }
@@ -210,7 +145,7 @@ func NewEndpoint(cfg *pool.Port) *Endpoint {
 	e.instanceId = make([]byte, 4)
 	_, err := rand.Read(e.instanceId) // random instance id
 	if err != nil {
-		Error.Fatalf("Can't seed with random bytes: %v", err)
+		util.Error.Fatalf("Can't seed with random bytes: %v", err)
 	}
 	e.targetHex = util.GetTargetHex(e.config.Difficulty) // default 000037EC8EC25E6D
 	e.difficulty = big.NewInt(e.config.Difficulty)       //default 300000
@@ -239,15 +174,15 @@ func (e *Endpoint) Listen(s *StratumServer) {
 	bindAddr := fmt.Sprintf("%s:%d", e.config.Host, e.config.Port)
 	addr, err := net.ResolveTCPAddr("tcp", bindAddr)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 	server, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 	defer server.Close()
 
-	Info.Printf("Stratum listening on %s", bindAddr)
+	util.Info.Printf("Stratum listening on %s", bindAddr)
 	accept := make(chan int, e.config.MaxConn)
 	n := 0
 
@@ -258,7 +193,7 @@ func (e *Endpoint) Listen(s *StratumServer) {
 		}
 		_ = conn.SetKeepAlive(true)
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		cs := &Session{conn: conn, ip: ip, enc: json.NewEncoder(conn), endpoint: e}
+		cs := &Session{conn: conn, ip: ip, enc: json.NewEncoder(conn), endpoint: e, address: s.config.Address}
 		n += 1
 
 		accept <- n
@@ -274,7 +209,7 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 
 	cert, err := tls.LoadX509KeyPair(t.TlsCert, t.TlsKey)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 
 	tlsConfig := &tls.Config{}
@@ -284,11 +219,11 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 
 	server, err := tls.Listen("tcp", bindAddr, tlsConfig)
 	if err != nil {
-		Error.Fatalf("Error: %v", err)
+		util.Error.Fatalf("Error: %v", err)
 	}
 	defer server.Close()
 
-	Info.Printf("Stratum TLS listening on %s", bindAddr)
+	util.Info.Printf("Stratum TLS listening on %s", bindAddr)
 	accept := make(chan int, e.config.MaxConn)
 	n := 0
 
@@ -297,7 +232,7 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 		if err != nil {
 			continue
 		}
-		Info.Printf("Accept Stratum TLS Connection from: %s, to: %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
+		util.Info.Printf("Accept Stratum TLS Connection from: %s, to: %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 
@@ -306,14 +241,14 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 			state := tlsConn.ConnectionState()
 			for _, v := range state.PeerCertificates {
 				pKIXPublicKey, _ := x509.MarshalPKIXPublicKey(v.PublicKey)
-				Info.Printf("x509.MarshalPKIXPublicKey: %v", pKIXPublicKey)
+				util.Info.Printf("x509.MarshalPKIXPublicKey: %v", pKIXPublicKey)
 			}
 		} else {
 			_ = conn.Close()
 			continue
 		}
 
-		cs := &Session{tlsConn: tlsConn, ip: ip, enc: json.NewEncoder(conn), endpoint: e}
+		cs := &Session{tlsConn: tlsConn, ip: ip, enc: json.NewEncoder(conn), endpoint: e, address: s.config.Address}
 		n += 1
 
 		accept <- n
@@ -331,17 +266,17 @@ func (s *StratumServer) handleClient(cs *Session, e *Endpoint) {
 	for {
 		data, isPrefix, err := connbuff.ReadLine()
 		if isPrefix {
-			Info.Println("Socket flood detected from", cs.ip)
+			util.Info.Println("Socket flood detected from", cs.ip)
 			break
 		} else if err == io.EOF {
 			if cs.login == "" && cs.id == "" {
-				Info.Println("Client disconnected from", cs.ip)
+				util.Info.Println("Client disconnected from", cs.ip)
 			} else {
-				Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
+				util.Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
 			}
 			break
 		} else if err != nil {
-			Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
+			util.Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
 			break
 		}
 
@@ -351,17 +286,18 @@ func (s *StratumServer) handleClient(cs *Session, e *Endpoint) {
 			var req JSONRpcReq
 			err = json.Unmarshal(data, &req)
 			if err != nil {
-				Error.Printf("Malformed request from %s: %v", cs.ip, err)
+				util.Error.Printf("Malformed request from %s: %v", cs.ip, err)
 				break
 			}
 			s.setDeadline(cs.conn)
 			err = cs.handleMessage(s, e, &req)
 			if err != nil {
-				Error.Printf("handleTCPMessage: %v", err)
+				util.Error.Printf("handleTCPMessage: %v", err)
 				break
 			}
 		}
 	}
+	s.removeMiner(cs.uid)
 	s.removeSession(cs)
 	_ = cs.conn.Close()
 }
@@ -373,17 +309,17 @@ func (s *StratumServer) handleTLSClient(cs *Session, e *Endpoint) {
 	for {
 		data, isPrefix, err := connbuff.ReadLine()
 		if isPrefix {
-			Info.Println("Socket flood detected from", cs.ip)
+			util.Info.Println("Socket flood detected from", cs.ip)
 			break
 		} else if err == io.EOF {
 			if cs.login == "" && cs.id == "" {
-				Info.Println("Client disconnected from", cs.ip)
+				util.Info.Println("Client disconnected from", cs.ip)
 			} else {
-				Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
+				util.Info.Printf("Client disconnected: Address: [%s] | Name: [%s] | IP: [%s]", cs.login, cs.id, cs.ip)
 			}
 			break
 		} else if err != nil {
-			Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
+			util.Error.Printf("Error reading from socket: %v | Address: [%s] | Name: [%s] | IP: [%s]", err, cs.login, cs.id, cs.ip)
 			break
 		}
 
@@ -393,17 +329,18 @@ func (s *StratumServer) handleTLSClient(cs *Session, e *Endpoint) {
 			var req JSONRpcReq
 			err = json.Unmarshal(data, &req)
 			if err != nil {
-				Error.Printf("Malformed request from %s: %v", cs.ip, err)
+				util.Error.Printf("Malformed request from %s: %v", cs.ip, err)
 				break
 			}
 			s.setTLSDeadline(cs.tlsConn)
 			err = cs.handleMessage(s, e, &req)
 			if err != nil {
-				Error.Printf("handleTCPMessage: %v", err)
+				util.Error.Printf("handleTCPMessage: %v", err)
 				break
 			}
 		}
 	}
+	s.removeMiner(cs.uid)
 	s.removeSession(cs)
 	_ = cs.tlsConn.Close()
 }
@@ -411,11 +348,11 @@ func (s *StratumServer) handleTLSClient(cs *Session, e *Endpoint) {
 func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq) error {
 	if req.Id == nil {
 		err := fmt.Errorf("server disconnect request")
-		Error.Println(err)
+		util.Error.Println(err)
 		return err
 	} else if req.Params == nil {
 		err := fmt.Errorf("server RPC request params")
-		Error.Println(err)
+		util.Error.Println(err)
 		return err
 	}
 
@@ -426,7 +363,7 @@ func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq)
 		var params LoginParams
 		err := json.Unmarshal(*req.Params, &params)
 		if err != nil {
-			Error.Println("Unable to parse params: login")
+			util.Error.Println("Unable to parse params: login")
 			return err
 		}
 		reply, errReply := s.handleLoginRPC(cs, &params)
@@ -438,7 +375,7 @@ func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq)
 		var params GetJobParams
 		err := json.Unmarshal(*req.Params, &params)
 		if err != nil {
-			Error.Println("Unable to parse params: getjob")
+			util.Error.Println("Unable to parse params: getjob")
 			return err
 		}
 		reply, errReply := s.handleGetJobRPC(cs, &params)
@@ -450,7 +387,7 @@ func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq)
 		var params SubmitParams
 		err := json.Unmarshal(*req.Params, &params)
 		if err != nil {
-			Error.Println("Unable to parse params: submit")
+			util.Error.Println("Unable to parse params: submit")
 			return err
 		}
 		reply, errReply := s.handleSubmitRPC(cs, &params)
@@ -536,64 +473,12 @@ func (s *StratumServer) currentBlockTemplate() *BlockTemplate {
 	return nil
 }
 
-func (s *StratumServer) checkUpstreams() {
-	candidate := int32(0)
-	backup := false
-
-	for i, v := range s.upstreams {
-		ok, err := v.Check(8, s.config.Address)
-		if err != nil {
-			Error.Printf("Upstream %v didn't pass check: %v", v.Name, err)
-		}
-		if ok && !backup {
-			candidate = int32(i)
-			backup = true
-		}
-	}
-
-	if s.upstream != candidate {
-		Info.Printf("Switching to %v upstream", s.upstreams[candidate].Name)
-		atomic.StoreInt32(&s.upstream, candidate)
-	}
-
-	upstreamsAllSick := true
-	for _, v := range s.upstreams {
-		if !v.Sick() {
-			upstreamsAllSick = false
-			break
-		}
-	}
-
-	s.upstreamsStates = append(s.upstreamsStates, upstreamsAllSick)
-	if len(s.upstreamsStates) >= 60 {
-		s.upstreamsStates = s.upstreamsStates[len(s.upstreamsStates)-60 : len(s.upstreamsStates)]
-
-		// sick in the past 5 minutes, log and exit
-		sickStatusAllTrue := true
-		for _, v := range s.upstreamsStates {
-			if !v {
-				sickStatusAllTrue = false
-				break
-			}
-		}
-
-		if sickStatusAllTrue {
-			Error.Fatal("all upstreams status were sick in the latest 5 minutes")
-		}
-	}
-}
-
 func (s *StratumServer) purgeStale() {
 	start := time.Now()
-	total, err := s.backend.FlushStaleStats(s.hashrateWindow, s.hashrateLargeWindow)
+	total, err := s.backend.PurgeRecords(s.purgeWindow)
 	if err != nil {
-		Error.Println("Failed to purge stale data from backend:", err)
+		util.Error.Println("Failed to purge  data from backend:", err)
 	} else {
-		Info.Printf("Purged stale stats from backend, %v shares affected, elapsed time %v", total, time.Since(start))
+		util.Info.Printf("Purged stale stats from backend, %v records affected, elapsed time %v", total, time.Since(start))
 	}
-}
-
-func (s *StratumServer) rpc() *rpc.RPCClient {
-	i := atomic.LoadInt32(&s.upstream)
-	return s.upstreams[i]
 }

@@ -2,9 +2,10 @@ package util
 
 import (
 	"encoding/hex"
-	"github.com/ethereum/go-ethereum/common/math"
 	"math/big"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common/math"
 )
 
 var Xmr = math.BigPow(10, 12)
@@ -43,17 +44,20 @@ func GetHashDifficulty(hashBytes []byte) (*big.Int, bool) {
 	return diff.Div(Diff1, diff), true
 }
 
-//func ValidateAddress(addy string, poolAddy string) bool {
-//	if len(addy) != len(poolAddy) {
-//		return false
+//	func ValidateAddress(addy string, poolAddy string) bool {
+//		if len(addy) != len(poolAddy) {
+//			return false
+//		}
+//		prefix, _ := utf8.DecodeRuneInString(addy)
+//		poolPrefix, _ := utf8.DecodeRuneInString(poolAddy)
+//		if prefix != poolPrefix {
+//			return false
+//		}
+//		return cnutil.ValidateAddress(addy)
 //	}
-//	prefix, _ := utf8.DecodeRuneInString(addy)
-//	poolPrefix, _ := utf8.DecodeRuneInString(poolAddy)
-//	if prefix != poolPrefix {
-//		return false
-//	}
-//	return cnutil.ValidateAddress(addy)
-//}
+func GetRxHashStr(hash []byte) string {
+	return hex.EncodeToString(reverse(hash))
+}
 
 func reverse(src []byte) []byte {
 	dst := make([]byte, len(src))

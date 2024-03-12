@@ -18,11 +18,14 @@ config.json
 testnet.json
 mainnet.json
 
-/build/_workspace/
-/build/bin/
+/build
 
 .idea
 .vscode
 
 xdagpool
 xdagpool.exe
+*.log
+*.exe
+
+xdagj_wallet.bin

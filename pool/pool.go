@@ -1,7 +1,13 @@
 package pool
 
+import (
+	"encoding/json"
+	"sync"
+)
+
+const PoolKey = "" // it can make pool boot/reboot without interfering.
+
 type StorageConfig struct {
-	Enabled           bool   `json:"enabled"`
 	Endpoint          string `json:"endpoint"`
 	PasswordEncrypted string `json:"passwordEncrypted"`
 	Password          string `json:"-"`
@@ -9,64 +15,48 @@ type StorageConfig struct {
 	PoolSize          int    `json:"poolSize"`
 }
 
-type StorageConfigFailover struct {
-	Enabled           bool     `json:"enabled"`
-	MasterName        string   `json:"masterName"`
-	SentinelEndpoints []string `json:"sentinelEndpoints"`
-	PasswordEncrypted string   `json:"passwordEncrypted"`
-	Password          string   `json:"-"`
-	Database          int64    `json:"database"`
-	PoolSize          int      `json:"poolSize"`
-}
-
-type UnlockerConfig struct {
-	Enabled        bool    `json:"enabled"`
-	PoolFee        float64 `json:"poolFee"`
-	PoolFeeAddress string  `json:"poolFeeAddress"`
-	Donate         bool    `json:"donate"`
-	Depth          int64   `json:"depth"`
-	ImmatureDepth  int64   `json:"immatureDepth"`
-	KeepTxFees     bool    `json:"keepTxFees"`
-	Interval       string  `json:"interval"`
-	DaemonName     string  `json:"daemonName"`
-	DaemonHost     string  `json:"daemonHost"`
-	DaemonPort     int     `json:"daemonPort"`
-	Timeout        string  `json:"timeout"`
+type PayOutConfig struct {
+	PoolRation      float64 `json:"poolRation"`
+	RewardRation    float64 `json:"rewardRation"`
+	DirectRation    float64 `json:"directRation"`
+	PoolFeeAddress  string  `json:"poolFeeAddress"`
+	Threshold       int64   `json:"threshold"`
+	PaymentInterval string  `json:"paymentInterval"`
+	Mode            string  `json:"mode"`
+	PaymentRemark   string  `json:"paymentRemark"`
 }
 
 type Config struct {
-	AddressEncrypted        string     `json:"addressEncrypted"`
-	Address                 string     `json:"-"`
-	BypassAddressValidation bool       `json:"bypassAddressValidation"`
-	BypassShareValidation   bool       `json:"bypassShareValidation"`
-	Log                     Log        `json:"log"`
-	Stratum                 Stratum    `json:"stratum"`
-	StratumTls              StratumTls `json:"stratumTls"`
-	BlockRefreshInterval    string     `json:"blockRefreshInterval"`
-	UpstreamCheckInterval   string     `json:"upstreamCheckInterval"`
-	Upstream                []Upstream `json:"upstream"`
-	EstimationWindow        string     `json:"estimationWindow"`
-	LuckWindow              string     `json:"luckWindow"`
-	LargeLuckWindow         string     `json:"largeLuckWindow"`
-	HashRateExpiration      string     `json:"hashRateExpiration"`
+	sync.RWMutex
+	AddressEncrypted string     `json:"addressEncrypted"`
+	Address          string     `json:"-"`
+	Log              Log        `json:"log"`
+	Stratum          Stratum    `json:"stratum"`
+	StratumTls       StratumTls `json:"stratumTls"`
+	EstimationWindow string     `json:"estimationWindow"`
+	LuckWindow       string     `json:"luckWindow"`
+	// LargeLuckWindow  string     `json:"largeLuckWindow"`
 
-	PurgeInterval       string `json:"purgeInterval"`
-	HashrateWindow      string `json:"hashrateWindow"`
-	HashrateLargeWindow string `json:"hashrateLargeWindow"`
+	PurgeInterval string `json:"purgeInterval"`
+	PurgeWindow   string `json:"purgeWindow"`
+	// PurgeLargeWindow string `json:"purgeLargeWindow"`
 
 	Threads  int      `json:"threads"`
 	Frontend Frontend `json:"frontend"`
 
-	Coin          string                `json:"coin"`
-	Redis         StorageConfig         `json:"redis"`
-	RedisFailover StorageConfigFailover `json:"redisFailover"`
+	Coin    string        `json:"coin"`
+	KvRocks StorageConfig `json:"kvrocks"`
 
-	BlockUnlocker UnlockerConfig `json:"unlocker"`
+	NodeName string `json:"node_name"`
+	NodeRpc  string `json:"node_rpc"`
+	NodeWs   string `json:"node_ws"`
+	WsSsl    bool   `json:"ws_ssl"`
 
-	NewrelicName    string `json:"newrelicName"`
-	NewrelicKey     string `json:"newrelicKey"`
-	NewrelicVerbose bool   `json:"newrelicVerbose"`
-	NewrelicEnabled bool   `json:"newrelicEnabled"`
+	RxMode          string `json:"rx_mode"`
+	WalletEncrypted string `json:"walletEncrypted"`
+	WalletPswd      string `json:"-"`
+
+	PayOut PayOutConfig `json:"payout"`
 }
 
 type Stratum struct {
@@ -107,4 +97,29 @@ type Frontend struct {
 
 type Log struct {
 	LogSetLevel int `json:"logSetLevel"`
+}
+
+// ws reward message from xdaj
+type XdagjReward struct {
+	TxBlock     string  `json:"txBlock"`
+	PreHash     string  `json:"preHash"`
+	Share       string  `json:"share"`
+	Amount      float64 `json:"amount"`
+	Fee         float64 `json:"fee"`
+	DonateBlock string  `json:"donateBlock"`
+	Donate      float64 `json:"donate"`
+}
+
+type Message struct {
+	MsgType    int             `json:"msgType"` // 1:task, 2:share, 3:rewards
+	MsgContent json.RawMessage `json:"msgContent"`
+}
+type Task struct {
+	PreHash  string `json:"preHash"`
+	TashSeed string `json:"taskSeed"`
+}
+type XdagjTask struct {
+	Data      Task   `json:"task"`
+	Timestamp uint64 `json:"taskTime"`
+	Index     int    `json:"taskIndex"`
 }

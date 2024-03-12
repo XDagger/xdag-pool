@@ -1,11 +1,15 @@
 package stratum
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/XDagger/xdagpool/payouts"
+	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/util"
 )
 
@@ -19,7 +23,7 @@ func init() {
 
 func (s *StratumServer) handleLoginRPC(cs *Session, params *LoginParams) (*JobReply, *ErrorReply) {
 	address, id := extractWorkerId(params.Login, params.Pass)
-	if !s.config.BypassAddressValidation && !util.ValidateAddress(address) {
+	if !util.ValidateAddress(address) {
 		util.Error.Printf("Invalid address %s used for login by %s", address, cs.ip)
 		return nil, &ErrorReply{Code: -1, Message: "Invalid address used for login"}
 	}
@@ -37,6 +41,15 @@ func (s *StratumServer) handleLoginRPC(cs *Session, params *LoginParams) (*JobRe
 	if !ok {
 		miner = NewMiner(cs.uid, cs.id, cs.ip, s.maxConcurrency)
 		s.registerMiner(miner)
+	}
+
+	ids, ok := s.workers.Get(address)
+	if !ok {
+		m := new(sync.Map)
+		m.Store(id, struct{}{})
+		s.workers.Set(address, m)
+	} else {
+		ids.Store(id, struct{}{})
 	}
 
 	util.Info.Printf("Miner connected %s.%s@%s", cs.login, cs.id, cs.ip)
@@ -90,7 +103,7 @@ func (s *StratumServer) handleSubmitRPC(cs *Session, params *SubmitParams) (*Sta
 		return nil, &ErrorReply{Code: -1, Message: "Block expired"}
 	}
 
-	validShare := miner.processShare(s, cs, job, t, nonce, params.Result, s.hashrateExpiration)
+	validShare := miner.processShare(s, cs, job, t, nonce, params.Result)
 	if !validShare {
 		return nil, &ErrorReply{Code: -1, Message: "Low difficulty share"}
 	}
@@ -139,11 +152,24 @@ func (s *StratumServer) broadcastNewJobs() {
 	util.Info.Printf("Jobs broadcast finished %s", time.Since(start))
 }
 
-func (s *StratumServer) refreshBlockTemplate(bcast bool) {
-	newBlock := s.fetchBlockTemplate()
-	if newBlock && bcast {
+func (s *StratumServer) refreshBlockTemplate(msg json.RawMessage) {
+	newBlock := s.fetchBlockTemplate(msg)
+	if newBlock {
 		s.broadcastNewJobs()
 	}
+}
+
+func (s *StratumServer) processRewards(msg json.RawMessage) {
+	var rewards []pool.XdagjReward
+	err := json.Unmarshal(msg, &rewards)
+	if err == nil {
+		for _, v := range rewards {
+			payouts.ProcessReward(s.config, s.backend, v)
+		}
+	} else {
+		util.Error.Println("unmarshal rewards error", err)
+	}
+
 }
 
 func extractWorkerId(loginWorkerPair, pass string) (string, string) {
