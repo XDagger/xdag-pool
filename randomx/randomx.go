@@ -137,7 +137,10 @@ func SetVMDataset(vm VM, dataset Dataset) {
 }
 
 func DestroyVM(vm VM) {
-	C.randomx_destroy_vm(vm)
+	if vm != nil {
+		C.randomx_destroy_vm(vm)
+	}
+
 }
 
 func CalculateHash(vm VM, in []byte) []byte {
