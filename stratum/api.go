@@ -779,7 +779,7 @@ func (s *StratumServer) XdagGetPoolWorkers(id uint64, params json.RawMessage) jr
 			minersWorks[address] = make(map[string]struct{})
 			minersWorks[address][name] = struct{}{}
 			worker := XdagWorker{
-				Address:  address,
+				Address:  m.Val.ip,
 				Name:     name,
 				Hashrate: m.Val.hashrate(s.estimationWindow),
 			}
@@ -799,7 +799,7 @@ func (s *StratumServer) XdagGetPoolWorkers(id uint64, params json.RawMessage) jr
 			if !ok2 {
 				minersWorks[address][name] = struct{}{}
 				worker := XdagWorker{
-					Address:  address,
+					Address:  m.Val.ip,
 					Name:     name,
 					Hashrate: m.Val.hashrate(s.estimationWindow),
 				}
@@ -813,6 +813,11 @@ func (s *StratumServer) XdagGetPoolWorkers(id uint64, params json.RawMessage) jr
 
 	}
 
+	rec = append(rec, XdagPoolMiners{
+		Address: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Status:  "fee",
+		Workers: make([]XdagWorker, 0),
+	})
 	for _, v := range miners {
 		rec = append(rec, *v)
 	}
