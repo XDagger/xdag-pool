@@ -59,9 +59,9 @@ func dividend(cfg *pool.Config, backend *kvstore.KvClient, login string, reward 
 
 	if cfg.PayOut.Mode == "solo" && cfg.PayOut.DirectRation > 0 {
 		backend.DivideSolo(login, reward, directFee, ms, ts)
-	} else {
+	} else if cfg.PayOut.Mode == "equal" {
+		divideAmount = divideAmount - rewardFee
 		if cfg.PayOut.DirectRation > 0 {
-			divideAmount = divideAmount - rewardFee
 			backend.DivideEqual(login, reward, directFee, divideAmount, ms, ts)
 		} else {
 			backend.DivideEqual(login, reward, 0, divideAmount, ms, ts)
