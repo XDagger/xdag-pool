@@ -21,6 +21,8 @@ Dependencies:
   * go-1.20
   * RandomX
 
+  enter clib/randomx, build randomx library with CMakeLists.txt
+
 ## Encrypt tool
 
 ### build
