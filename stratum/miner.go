@@ -146,16 +146,18 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	copy(shareBuff, t.buffer)
 
 	addr, _, _ := base58.ChkDec(s.config.Address)
-	copy(shareBuff[len(t.buffer):], addr[:len(addr)-4]) // without checksum bytes
+	copy(shareBuff[len(t.buffer)+12:], addr[:len(addr)-4]) // without checksum bytes
 
 	enonce := make([]byte, 4)
 	binary.BigEndian.PutUint32(enonce, job.extraNonce)
-	copy(shareBuff[len(t.buffer)+len(addr)-4:], enonce[:]) // 4 bytes
+	copy(shareBuff[len(t.buffer):], enonce[:]) // 4 bytes
 
-	copy(shareBuff[len(t.buffer)+len(addr):], cs.endpoint.instanceId[:]) // 4 bytes
+	copy(shareBuff[len(t.buffer)+4:], cs.endpoint.instanceId[:3]) // 3 bytes of instanceId
 
 	nonceBuff, _ := hex.DecodeString(nonce) // 32bits (4 bytes) share nonce sent by miner
-	copy(shareBuff[60:], nonceBuff[:4])
+	copy(shareBuff[len(t.buffer)+7:], nonceBuff[:4])
+
+	shareBuff[len(t.buffer)+11] = cs.endpoint.instanceId[3] // 1 bytes of instanceId
 
 	hashBytes := util.RxHash(shareBuff)
 
