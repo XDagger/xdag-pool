@@ -73,7 +73,7 @@ func addressFromShare(share string) (string, error) {
 	if len(share) != 64 {
 		return "", errors.New("share length error")
 	}
-	b, err := hex.DecodeString(share[:40])
+	b, err := hex.DecodeString(share[24:])
 	if err != nil {
 		return "", err
 	}
