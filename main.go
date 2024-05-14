@@ -123,6 +123,9 @@ func startFrontend(cfg *pool.Config, s *stratum.StratumServer) {
 	apiServer.Add("xdag_getPoolWorkers", s.XdagGetPoolWorkers)
 	apiServer.Add("xdag_poolConfig", s.XdagPoolConfig)
 	apiServer.Add("xdag_updatePoolConfig", s.XdagUpdatePoolConfig)
+	apiServer.Add("xdag_minerAccount", s.XdagMinerAccount)
+	apiServer.Add("xdag_minerHashrate", s.XdagMinerHashrate)
+	apiServer.Add("xdag_poolHashrate", s.XdagPoolHashrate)
 
 	err := apiServer.Run(cfg.Frontend.Listen)
 	if err != nil {
