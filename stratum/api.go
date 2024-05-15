@@ -981,7 +981,7 @@ func (s *StratumServer) XdagMinerHashrate(id uint64, params json.RawMessage) jrp
 			}
 			i++
 			hashrate += v.Hashrate
-			hashrate24h += hashrate24h
+			hashrate24h += v.Hashrate24h
 			if !v.Timeout {
 				totalOnline++
 			}
