@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/XDagger/xdagpool/jrpc"
+	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/util"
 	"github.com/XDagger/xdagpool/ws"
 	"github.com/gorilla/mux"
@@ -1030,4 +1031,8 @@ func (s *StratumServer) XdagPoolHashrate(id uint64, params json.RawMessage) jrpc
 		Total:       total,
 		TotalOnline: totalOnline,
 	}, nil)
+}
+
+func (s *StratumServer) XdagPoolVersion(id uint64, params json.RawMessage) jrpc.Response {
+	return jrpc.EncodeResponse(id, pool.Version, nil)
 }
