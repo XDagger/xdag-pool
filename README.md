@@ -264,3 +264,19 @@ json {
   "id": 1
 }
 ```
+
+### xdag_poolVersion
+#### request
+```
+curl http://127.0.0.1:8082/api -s -X POST -H "Content-Type: application/json" --data
+'{"jsonrpc":"2.0","method":"xdag_poolVersion","params":[""],"id":1}'
+```
+
+#### response
+```
+json {
+  "jsonrpc": "2.0",
+  "result": "0.1.0",
+  "id": 1
+}
+```
