@@ -653,8 +653,16 @@ func (s *StratumServer) XdagPoolConfig(id uint64, params json.RawMessage) jrpc.R
 	var rec XdagPoolConfig
 	s.config.RLock()
 	defer s.config.RUnlock()
-	rec.PoolIP = s.config.Stratum.Ports[0].Host
-	rec.PoolPort = s.config.Stratum.Ports[0].Port
+	if s.config.StratumTls.Enabled {
+		rec.PoolIP = s.config.StratumTls.Ports[0].Host
+		rec.PoolPort = s.config.StratumTls.Ports[0].Port
+		rec.GlobalMinerLimit = s.config.StratumTls.Ports[0].MaxConn
+	} else {
+		rec.PoolIP = s.config.Stratum.Ports[0].Host
+		rec.PoolPort = s.config.Stratum.Ports[0].Port
+		rec.GlobalMinerLimit = s.config.Stratum.Ports[0].MaxConn
+	}
+
 	n := strings.LastIndex(s.config.NodeRpc, ":")
 	if n > 0 && n < len(s.config.NodeRpc)-1 {
 		port, err := strconv.Atoi(s.config.NodeRpc[n+1:])
@@ -668,7 +676,6 @@ func (s *StratumServer) XdagPoolConfig(id uint64, params json.RawMessage) jrpc.R
 		rec.NodeIP = s.config.NodeRpc
 	}
 
-	rec.GlobalMinerLimit = s.config.Stratum.Ports[0].MaxConn
 	rec.MaxConnectMinerPerIP = 0
 	rec.MaxMinerPerAccount = 0
 	rec.PoolDirectRation = fmt.Sprintf("%v", s.config.PayOut.DirectRation)
