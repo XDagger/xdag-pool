@@ -91,8 +91,8 @@ Configuration is self-describing, just copy *config.example.json* to *config.jso
 
 	"payout": {
 		"poolRation": 5.0,
-		"rewardRation": 5.0,
-		"directRation": 5.0,
+		"rewardRation": 0.0,
+		"directRation": 0.0,
     // threshhold to pay miner
 		"threshold": 3,
 		"paymentInterval": "10m",
