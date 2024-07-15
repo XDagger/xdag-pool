@@ -23,7 +23,8 @@ func PaymentTask(ctx context.Context, cfg *pool.Config, backend *kvstore.KvClien
 			util.Info.Println("exit payment task")
 			return
 		case <-ticker.C:
-			payMiners(cfg, backend)
+			// payMiners(cfg, backend)
+			batchPayMiners(cfg, backend)
 		}
 	}
 }
