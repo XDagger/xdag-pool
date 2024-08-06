@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -176,6 +177,31 @@ func (r *KvClient) SetPayment(login, txHash, remark string, payment float64, ms,
 	return err
 }
 
+func (r *KvClient) SetChunkPayment(logins []string, txHash, remark string, payments []int64, ms, ts int64) error {
+	if len(logins) != len(payments) {
+		return errors.New("set payment chunck size not match")
+	}
+	var total int64
+	for _, v := range payments {
+		total += v
+	}
+	tx := r.client.TxPipeline()
+	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "payment", total)
+	tx.HIncrBy(ctx, r.formatKey("pool", "account"), "unpaid", -1*total)
+
+	for i := 0; i < len(logins); i++ {
+		tx.HIncrBy(ctx, r.formatKey("account", logins[i]), "payment", payments[i])
+		tx.HIncrBy(ctx, r.formatKey("account", logins[i]), "unpaid", -1*payments[i])
+
+		tx.ZAdd(ctx, r.formatKey("payment", logins[i]), redis.Z{Score: float64(ts),
+			Member: join(float64(payments[i])/float64(1e9), ms, txHash, remark)})
+		tx.ZAdd(ctx, r.formatKey("balance", logins[i]), redis.Z{Score: float64(ts),
+			Member: join("payment", float64(payments[i])/float64(1e9), ms, txHash, remark)})
+	}
+	_, err := tx.Exec(ctx)
+	return err
+}
+
 // func (r *KvClient) SetFund(fund, txHash, jobHash, remark string, payment float64, ms, ts int64) error {
 // 	_, err := r.client.ZAdd(ctx, r.formatKey("donate", fund), redis.Z{Score: float64(ts),
 // 		Member: join(payment, ms, txHash, jobHash, remark)}).Result()
@@ -331,6 +357,9 @@ func (r *KvClient) GetMinerName(jobHash string) []string {
 
 // set lowest hash finder reward of a job
 func (r *KvClient) SetFinderReward(login string, reward pool.XdagjReward, fee float64, ms, ts int64) {
+	if fee*float64(1e9) < 1.0 {
+		return
+	}
 	// minimum hash finder
 	raw, err := r.client.ZRange(ctx, r.formatKey("mini", reward.PreHash), 0, 0).Result()
 	if err != nil {

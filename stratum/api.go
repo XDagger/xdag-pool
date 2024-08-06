@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/XDagger/xdagpool/jrpc"
+	"github.com/XDagger/xdagpool/pool"
 	"github.com/XDagger/xdagpool/util"
 	"github.com/XDagger/xdagpool/ws"
 	"github.com/gorilla/mux"
@@ -652,8 +653,16 @@ func (s *StratumServer) XdagPoolConfig(id uint64, params json.RawMessage) jrpc.R
 	var rec XdagPoolConfig
 	s.config.RLock()
 	defer s.config.RUnlock()
-	rec.PoolIP = s.config.Stratum.Ports[0].Host
-	rec.PoolPort = s.config.Stratum.Ports[0].Port
+	if s.config.StratumTls.Enabled {
+		rec.PoolIP = s.config.StratumTls.Ports[0].Host
+		rec.PoolPort = s.config.StratumTls.Ports[0].Port
+		rec.GlobalMinerLimit = s.config.StratumTls.Ports[0].MaxConn
+	} else {
+		rec.PoolIP = s.config.Stratum.Ports[0].Host
+		rec.PoolPort = s.config.Stratum.Ports[0].Port
+		rec.GlobalMinerLimit = s.config.Stratum.Ports[0].MaxConn
+	}
+
 	n := strings.LastIndex(s.config.NodeRpc, ":")
 	if n > 0 && n < len(s.config.NodeRpc)-1 {
 		port, err := strconv.Atoi(s.config.NodeRpc[n+1:])
@@ -667,7 +676,6 @@ func (s *StratumServer) XdagPoolConfig(id uint64, params json.RawMessage) jrpc.R
 		rec.NodeIP = s.config.NodeRpc
 	}
 
-	rec.GlobalMinerLimit = s.config.Stratum.Ports[0].MaxConn
 	rec.MaxConnectMinerPerIP = 0
 	rec.MaxMinerPerAccount = 0
 	rec.PoolDirectRation = fmt.Sprintf("%v", s.config.PayOut.DirectRation)
@@ -823,4 +831,215 @@ func (s *StratumServer) XdagGetPoolWorkers(id uint64, params json.RawMessage) jr
 	}
 
 	return jrpc.EncodeResponse(id, rec, nil)
+}
+
+type MinerAccount struct {
+	Address      string  `json:"address"`
+	Timestamp    int64   `json:"timestamp"`
+	TotalReward  float64 `json:"total_reward"`
+	TotalPayment float64 `json:"total_payment"`
+	TotalUnpaid  float64 `json:"total_unpaid"`
+}
+
+func (s *StratumServer) XdagMinerAccount(id uint64, params json.RawMessage) jrpc.Response {
+	now := util.MakeTimestamp()
+
+	var args []json.RawMessage
+	if err := json.Unmarshal(params, &args); err != nil {
+		return jrpc.EncodeResponse(id, struct{}{}, err)
+	}
+	if len(args) != 1 {
+		return jrpc.EncodeResponse(id, struct{}{}, errors.New("params length error"))
+	}
+
+	var address string
+	err := json.Unmarshal(args[0], &address)
+	if err != nil {
+		return jrpc.EncodeResponse(id, struct{}{}, err)
+	}
+
+	if address == "" || !util.ValidateAddress(address) {
+		return jrpc.EncodeResponse(id, struct{}{}, errors.New("addres is empty or invalid"))
+	}
+	reward, payment, unpaid, err := s.backend.GetMinerAccount(address)
+	if err != nil {
+		return jrpc.EncodeResponse(id, struct{}{}, err)
+	}
+
+	data := MinerAccount{
+		Address:      address,
+		Timestamp:    now,
+		TotalReward:  reward,
+		TotalPayment: payment,
+		TotalUnpaid:  unpaid,
+	}
+	return jrpc.EncodeResponse(id, data, nil)
+}
+
+type MinerHashrate struct {
+	Address          string           `json:"address"`
+	Timestamp        int64            `json:"timestamp"`
+	TotalHashrate    float64          `json:"total_hashrate"`
+	TotalHashrate24h float64          `json:"total_hashrate24h"`
+	TotalOnline      int              `json:"total_online"`
+	Hashrate         []WorkerHashrate `json:"hashrate"`
+}
+
+type WorkerHashrate struct {
+	Name          string  `json:"name"`
+	Hashrate      float64 `json:"hashrate"`
+	Hashrate24h   float64 `json:"hashrate24h"`
+	LastBeat      int64   `json:"lastBeat"`
+	ValidShares   int64   `json:"validShares"`
+	StaleShares   int64   `json:"staleShares"`
+	InvalidShares int64   `json:"invalidShares"`
+	Accepts       int64   `json:"accepts"`
+	Rejects       int64   `json:"rejects"`
+	Ip            string  `json:"ip"`
+	Warning       bool    `json:"warning"`
+	Timeout       bool    `json:"timeout"`
+}
+
+func (s *StratumServer) XdagMinerHashrate(id uint64, params json.RawMessage) jrpc.Response {
+	now := util.MakeTimestamp()
+
+	var args []json.RawMessage
+	if err := json.Unmarshal(params, &args); err != nil {
+		return jrpc.EncodeResponse(id, struct{}{}, err)
+	}
+	if len(args) != 1 {
+		return jrpc.EncodeResponse(id, struct{}{}, errors.New("params length error"))
+	}
+
+	var address string
+	err := json.Unmarshal(args[0], &address)
+	if err != nil {
+		return jrpc.EncodeResponse(id, struct{}{}, err)
+	}
+
+	if address == "" || !util.ValidateAddress(address) {
+		return jrpc.EncodeResponse(id, struct{}{}, errors.New("addres is empty or invalid"))
+	}
+	workers := s.workers.GetWorkers(address)
+	if len(workers) == 0 {
+		return jrpc.EncodeResponse(id, struct{}{}, errors.New("no workers"))
+	}
+
+	var result []WorkerHashrate
+	window24h := 24 * time.Hour
+
+	minerHashrate := MinerHashrate{
+		Address:   address,
+		Timestamp: now,
+	}
+
+	dataChan := make(chan WorkerHashrate, len(workers))
+
+	for _, w := range workers {
+		go func(adress, w string) {
+			m, ok := s.miners.Get(address + "." + w)
+			if !ok {
+				dataChan <- WorkerHashrate{}
+				return
+			}
+
+			lastBeat := m.getLastBeat()
+			hashrate := m.hashrate(s.estimationWindow)
+			hashrate24h := m.hashrate(window24h)
+			stats := WorkerHashrate{
+				Name:          w,
+				Hashrate:      hashrate,
+				Hashrate24h:   hashrate24h,
+				LastBeat:      lastBeat,
+				ValidShares:   atomic.LoadInt64(&m.validShares),
+				StaleShares:   atomic.LoadInt64(&m.staleShares),
+				InvalidShares: atomic.LoadInt64(&m.invalidShares),
+				Accepts:       atomic.LoadInt64(&m.accepts),
+				Rejects:       atomic.LoadInt64(&m.rejects),
+			}
+			if !s.config.Frontend.HideIP {
+				stats.Ip = m.ip
+			} else {
+				stats.Ip = "-"
+
+			}
+
+			if now-lastBeat > (int64(s.timeout/2) / 1000000) {
+				stats.Warning = true
+			}
+			if now-lastBeat > (int64(s.timeout) / 1000000) {
+				stats.Timeout = true
+			}
+			dataChan <- stats
+		}(address, w)
+	}
+
+	i := 0
+	var hashrate float64
+	var hashrate24h float64
+	totalOnline := 0
+
+	for {
+		select {
+		case <-time.After(10 * time.Second):
+			return jrpc.EncodeResponse(id, struct{}{}, errors.New("timeout"))
+		case v := <-dataChan:
+			if v.Name != "" {
+				result = append(result, v)
+			}
+			i++
+			hashrate += v.Hashrate
+			hashrate24h += v.Hashrate24h
+			if !v.Timeout {
+				totalOnline++
+			}
+
+			if i == len(workers) {
+				minerHashrate.TotalHashrate = hashrate
+				minerHashrate.TotalHashrate24h = hashrate24h
+				minerHashrate.TotalOnline = totalOnline
+				minerHashrate.Hashrate = result
+				return jrpc.EncodeResponse(id, minerHashrate, nil)
+			}
+		}
+	}
+
+}
+
+type PoolHashrate struct {
+	Hashrate    float64 `json:"hashrate"`
+	Hashrate24h float64 `json:"hashrate24h"`
+	Total       int     `json:"total"`
+	TotalOnline int     `json:"total_online"`
+}
+
+func (s *StratumServer) XdagPoolHashrate(id uint64, params json.RawMessage) jrpc.Response {
+	now := util.MakeTimestamp()
+	totalhashrate := float64(0)
+	totalhashrate24h := float64(0)
+	total := 0
+	totalOnline := 0
+	window24h := 24 * time.Hour
+
+	for m := range s.miners.Iter() {
+		lastBeat := m.Val.getLastBeat()
+		hashrate := m.Val.hashrate(s.estimationWindow)
+		hashrate24h := m.Val.hashrate(window24h)
+		totalhashrate += hashrate
+		totalhashrate24h += hashrate24h
+		total++
+		if now-lastBeat <= (int64(s.timeout) / 1000000) {
+			totalOnline++
+		}
+	}
+	return jrpc.EncodeResponse(id, PoolHashrate{
+		Hashrate:    totalhashrate,
+		Hashrate24h: totalhashrate24h,
+		Total:       total,
+		TotalOnline: totalOnline,
+	}, nil)
+}
+
+func (s *StratumServer) XdagPoolVersion(id uint64, params json.RawMessage) jrpc.Response {
+	return jrpc.EncodeResponse(id, pool.Version, nil)
 }
