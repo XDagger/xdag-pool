@@ -124,6 +124,9 @@ func TransactionChunkBlock(from string, to []string, remark string, value []int6
 	// header: fee
 	sb.WriteString("0000000000000000")
 
+	// tranx_nonce
+	sb.WriteString("0000000000000000000000000000000000000000000000000000000000000000")
+
 	// input field: input address
 	sb.WriteString(inAddress)
 	// input field: input value
@@ -157,8 +160,8 @@ func TransactionChunkBlock(from string, to []string, remark string, value []int6
 
 func FieldChunkTypes(isTest, hasRemark, isPubKeyEven bool, chunkSize int) string {
 
-	// 1/8--2/C--D--D--D--D--D--D--D--D--D--D--[9/D]--6/7--5--5
-	// header(main/test)--input(old/new)--outputs--[remark]--pubKey(even/odd)--sign_r--sign_s
+	// 1/8--E--2/C--D--D--D--D--D--D--D--D--D--[9/D]--6/7--5--5
+	// header(main/test)--tranx_nonce--input(old/new)--outputs--[remark]--pubKey(even/odd)--sign_r--sign_s
 	fieldTypes := make([]byte, 16)
 
 	if isTest {
@@ -166,12 +169,13 @@ func FieldChunkTypes(isTest, hasRemark, isPubKeyEven bool, chunkSize int) string
 	} else {
 		fieldTypes[0] = 0x01 // main net
 	}
+	fieldTypes[1] = 0x0E // new address
 
-	fieldTypes[1] = 0x0C // new address
+	fieldTypes[2] = 0x0C // new address
 
-	index := 2
+	index := 3
 	for i := 0; i < chunkSize; i++ {
-		fieldTypes[2+i] = 0x0D
+		fieldTypes[3+i] = 0x0D
 		index += 1
 	}
 	if hasRemark {

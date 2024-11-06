@@ -23,9 +23,9 @@ func batchPayMiners(cfg *pool.Config, backend *kvstore.KvClient) {
 	}
 	var chunkSize int
 	if len(remark) > 0 {
-		chunkSize = 10
+		chunkSize = 9
 	} else {
-		chunkSize = 11
+		chunkSize = 10
 	}
 	batchAddress := make([]string, 0, chunkSize)
 	batchAmount := make([]int64, 0, chunkSize)
@@ -67,7 +67,7 @@ func transfer2chunk(miners []string, remark string, amounts []int64) (txHash str
 		return "", errors.New("remark error")
 	}
 
-	if len(miners) != len(amounts) || len(miners) > 11 || (len(miners) == 11 && len(remark) > 0) {
+	if len(miners) != len(amounts) || len(miners) > 10 || (len(miners) == 10 && len(remark) > 0) {
 		return "", errors.New("transfer chunck size error")
 	}
 
