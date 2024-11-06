@@ -48,24 +48,25 @@ func dividend(cfg *pool.Config, backend *kvstore.KvClient, login string, reward 
 	defer cfg.RUnlock()
 	poolFee := reward.Amount * cfg.PayOut.PoolRation / 100.0     // for pool owner
 	rewardFee := reward.Amount * cfg.PayOut.RewardRation / 100.0 // reward to lowest hash finder
-	directFee := reward.Amount * cfg.PayOut.DirectRation / 100.0 // divided equally to every miner
+	// directFee := reward.Amount * cfg.PayOut.DirectRation / 100.0 // divided equally to every miner
 
-	divideAmount := reward.Amount - poolFee - directFee
+	divideAmount := reward.Amount - poolFee //- directFee
 	if cfg.PayOut.Mode == "solo" {
 		backend.SetFinderReward(login, reward, divideAmount, ms, ts)
 	} else {
 		backend.SetFinderReward(login, reward, rewardFee, ms, ts)
 	}
 
-	if cfg.PayOut.Mode == "solo" && cfg.PayOut.DirectRation > 0 {
-		backend.DivideSolo(login, reward, directFee, ms, ts)
-	} else if cfg.PayOut.Mode == "equal" {
+	// if cfg.PayOut.Mode == "solo" && cfg.PayOut.DirectRation > 0 {
+	// 	backend.DivideSolo(login, reward, directFee, ms, ts)
+	// } else
+	if cfg.PayOut.Mode == "equal" {
 		divideAmount = divideAmount - rewardFee
-		if cfg.PayOut.DirectRation > 0 {
-			backend.DivideEqual(login, reward, directFee, divideAmount, ms, ts)
-		} else {
-			backend.DivideEqual(login, reward, 0, divideAmount, ms, ts)
-		}
+		// if cfg.PayOut.DirectRation > 0 {
+		// 	backend.DivideEqual(login, reward, directFee, divideAmount, ms, ts)
+		// } else {
+		backend.DivideEqual(login, reward, 0, divideAmount, ms, ts)
+		// }
 	}
 }
 

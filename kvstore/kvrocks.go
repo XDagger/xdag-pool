@@ -377,21 +377,21 @@ func (r *KvClient) SetFinderReward(login string, reward pool.XdagjReward, fee fl
 	}
 }
 
-func (r *KvClient) DivideSolo(login string, reward pool.XdagjReward, fee float64, ms, ts int64) {
-	miners := r.GetMinerName(reward.PreHash)
-	if len(miners) == 0 {
-		util.Error.Println("solo direct reward miners count is 0", reward.PreHash)
-		return
-	}
-	directPerMiner := fee / float64(len(miners))
-	for _, miner := range miners {
-		err := r.SetMinerReward(miner, reward.TxBlock, reward.PreHash, directPerMiner, ms, ts)
-		if err == nil {
-			util.Error.Println("store solo direct reward error", reward.PreHash, miner, directPerMiner, err)
-			continue
-		}
-	}
-}
+// func (r *KvClient) DivideSolo(login string, reward pool.XdagjReward, fee float64, ms, ts int64) {
+// 	miners := r.GetMinerName(reward.PreHash)
+// 	if len(miners) == 0 {
+// 		util.Error.Println("solo direct reward miners count is 0", reward.PreHash)
+// 		return
+// 	}
+// 	directPerMiner := fee / float64(len(miners))
+// 	for _, miner := range miners {
+// 		err := r.SetMinerReward(miner, reward.TxBlock, reward.PreHash, directPerMiner, ms, ts)
+// 		if err != nil {
+// 			util.Error.Println("store solo direct reward error", reward.PreHash, miner, directPerMiner, err)
+// 			// continue
+// 		}
+// 	}
+// }
 
 func (r *KvClient) DivideEqual(login string, reward pool.XdagjReward, fee, amount float64, ms, ts int64) {
 	miners := r.GetProportion(reward.PreHash)
