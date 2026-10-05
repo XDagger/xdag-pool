@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -137,7 +138,7 @@ func (m *Miner) hashrate(estimationWindow time.Duration) float64 {
 }
 
 func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTemplate,
-	nonce string, result string) bool {
+	nonce string, result string) (valid, needBlock bool) {
 	// r := s.rpc()
 
 	// 32 bytes (reserved) = 20 bytes (pool owner wallet address) + 4 bytes (extraNonce) + 4 bytes (instanceId) + 4 bytes (share nonce)
@@ -162,10 +163,17 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 	hashBytes := util.RxHash(shareBuff)
 
 	if hex.EncodeToString(hashBytes) != result {
+		ip, _, _ := net.SplitHostPort(cs.ip)
+		err := s.backend.SetBlacklist(ip)
+		if err != nil {
+			util.Error.Printf("Set Blacklist error %v: %v@%v", err, cs.login, cs.ip)
+		} else {
+			util.Info.Printf("Set Blacklist : %v@%v", cs.login, cs.ip)
+		}
 		util.Error.Printf("Bad hash from miner %v.%v@%v", cs.login, cs.id, cs.ip)
 		util.ShareLog.Printf("Bad hash from miner %v.%v@%v", cs.login, cs.id, cs.ip)
 		atomic.AddInt64(&m.invalidShares, 1)
-		return false
+		return false, true
 	}
 
 	hashDiff, ok := util.GetHashDifficulty(hashBytes)
@@ -173,7 +181,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 		util.Error.Printf("Bad hash from miner %v.%v@%v", cs.login, cs.id, cs.ip)
 		util.ShareLog.Printf("Bad hash from miner %v.%v@%v", cs.login, cs.id, cs.ip)
 		atomic.AddInt64(&m.invalidShares, 1)
-		return false
+		return false, false
 	}
 
 	block := hashDiff.Cmp(cs.endpoint.difficulty) >= 0
@@ -228,7 +236,7 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 			if err != nil {
 				util.Error.Println("Failed to insert invalid share data into backend:", err)
 			}
-			return false
+			return false, false
 		}
 		if err != nil {
 			util.Error.Println("Failed to insert block candidate into backend:", err)
@@ -251,12 +259,12 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 		err := s.backend.WriteRejectShare(ms, ts, cs.login, cs.id, cs.endpoint.difficulty.Int64())
 		if err != nil {
 			util.Error.Println("Failed to insert reject share data into backend:", err)
-			return false
+			return false, false
 		}
 		util.Error.Printf("Rejected low difficulty share of %v from %v.%v@%v", hashDiff, cs.login, cs.id, cs.ip)
 		util.ShareLog.Printf("Rejected low difficulty share of %v from %v.%v@%v", hashDiff, cs.login, cs.id, cs.ip)
 		atomic.AddInt64(&m.invalidShares, 1)
-		return false
+		return false, false
 	}
 
 	atomic.AddInt64(&s.roundShares, cs.endpoint.config.Difficulty)
@@ -265,5 +273,5 @@ func (m *Miner) processShare(s *StratumServer, cs *Session, job *Job, t *BlockTe
 
 	util.Info.Printf("Valid share of %v at difficulty %v from %v.%v@%v", hashDiff, cs.endpoint.config.Difficulty, cs.login, cs.id, cs.ip)
 	util.ShareLog.Printf("Valid share of %v at difficulty %v from %v.%v@%v", hashDiff, cs.endpoint.config.Difficulty, cs.login, cs.id, cs.ip)
-	return true
+	return true, false
 }

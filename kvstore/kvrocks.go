@@ -18,6 +18,8 @@ var ctx = context.Background()
 
 const expireDuration = 30 * time.Minute
 
+const blacklistDuration = int64((24 * time.Hour) / time.Second)
+
 type KvClient struct {
 	client *redis.Client
 	prefix string
@@ -556,5 +558,34 @@ func (r *KvClient) PurgeRecords(window time.Duration) (int64, error) {
 			break
 		}
 	}
+
+	// blacklist scores are expiry times, so the cutoff is now, not the window
+	n, err = r.client.ZRemRangeByScore(ctx, r.formatKey("blacklist", "ip"), "-inf", fmt.Sprint(now)).Result()
+	if err != nil {
+		return total, err
+	}
+	total += n
+
 	return total, nil
+}
+
+// SetBlacklist blacklist entries are stored in sorted sets with score as the expiry time
+// (unix seconds), so a member is blacklisted while its score is later than now
+func (r *KvClient) SetBlacklist(ip string) error {
+	expire := float64(util.MakeTimestamp()/1000 + blacklistDuration)
+	tx := r.client.TxPipeline()
+	// tx.ZAdd(ctx, r.formatKey("blacklist", "address"), redis.Z{Score: expire, Member: address})
+	tx.ZAdd(ctx, r.formatKey("blacklist", "ip"), redis.Z{Score: expire, Member: ip})
+	_, err := tx.Exec(ctx)
+	return err
+}
+
+func (r *KvClient) IsBlacklist(ip string) bool {
+	now := float64(util.MakeTimestamp() / 1000)
+
+	expire, err := r.client.ZScore(ctx, r.formatKey("blacklist", "ip"), ip).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		util.Error.Println("check blacklist ip error", ip, err)
+	}
+	return err == nil && expire > now
 }

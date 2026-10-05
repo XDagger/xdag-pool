@@ -191,8 +191,14 @@ func (e *Endpoint) Listen(s *StratumServer) {
 		if err != nil {
 			continue
 		}
+		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+
+		if s.backend.IsBlacklist(ip) {
+			util.Error.Printf("Close Stratum Blacklist Connection from: %s", ip)
+			conn.Close()
+			continue
+		}
 		_ = conn.SetKeepAlive(true)
-		// ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 		cs := &Session{conn: conn, ip: conn.RemoteAddr().String(), enc: json.NewEncoder(conn), endpoint: e, address: s.config.Address}
 		n += 1
 
@@ -232,9 +238,14 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 		if err != nil {
 			continue
 		}
-		util.Info.Printf("Accept Stratum TLS Connection from: %s, to: %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
-
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+
+		if s.backend.IsBlacklist(ip) {
+			conn.Close()
+			util.Error.Printf("Close Stratum TLS Blacklist Connection from: %s", ip)
+			continue
+		}
+		util.Info.Printf("Accept Stratum TLS Connection from: %s, to: %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		tlsConn, ok := conn.(*tls.Conn)
 		if ok {
@@ -248,7 +259,7 @@ func (e *Endpoint) ListenTLS(s *StratumServer, t pool.StratumTls) {
 			continue
 		}
 
-		cs := &Session{tlsConn: tlsConn, ip: ip, enc: json.NewEncoder(conn), endpoint: e, address: s.config.Address}
+		cs := &Session{tlsConn: tlsConn, ip: conn.RemoteAddr().String(), enc: json.NewEncoder(conn), endpoint: e, address: s.config.Address}
 		n += 1
 
 		accept <- n
@@ -391,6 +402,9 @@ func (cs *Session) handleMessage(s *StratumServer, e *Endpoint, req *JSONRpcReq)
 			return err
 		}
 		reply, errReply := s.handleSubmitRPC(cs, &params)
+		if errReply != nil && errReply.Code == -2 { // fake share , close connection
+			return cs.sendError(req.Id, errReply, true)
+		}
 		if errReply != nil {
 			return cs.sendError(req.Id, errReply, false)
 		}
