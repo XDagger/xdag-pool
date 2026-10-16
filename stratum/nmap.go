@@ -3,7 +3,6 @@ package stratum
 
 import (
 	"fmt"
-	"hash/fnv"
 	"sync"
 )
 
@@ -28,9 +27,10 @@ func NewWorkersMap() WorkersMap {
 
 // Returns shard under given key
 func (m WorkersMap) GetShard(key string) *WorkersMapShared {
-	hasher := fnv.New32()
-	_, _ = hasher.Write([]byte(key))
-	return m[hasher.Sum32()%uint32(SHARD_COUNT)]
+	// hasher := fnv.New32()
+	// _, _ = hasher.Write([]byte(key))
+	// return m[hasher.Sum32()%uint32(SHARD_COUNT)]
+	return m[uint(fnv32(key))%uint(SHARD_COUNT)]
 }
 
 // Sets the given value under the specified key.

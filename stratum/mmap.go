@@ -2,11 +2,10 @@
 package stratum
 
 import (
-	"hash/fnv"
 	"sync"
 )
 
-var SHARD_COUNT = 256
+const SHARD_COUNT = 256
 
 // TODO: Add Keys function which returns an array of keys for the map.
 
@@ -29,9 +28,10 @@ func NewMinersMap() MinersMap {
 
 // Returns shard under given key
 func (m MinersMap) GetShard(key string) *MinersMapShared {
-	hasher := fnv.New32()
-	_, _ = hasher.Write([]byte(key))
-	return m[hasher.Sum32()%uint32(SHARD_COUNT)]
+	// hasher := fnv.New32()
+	// _, _ = hasher.Write([]byte(key))
+	// return m[hasher.Sum32()%uint32(SHARD_COUNT)]
+	return m[uint(fnv32(key))%uint(SHARD_COUNT)]
 }
 
 // Sets the given value under the specified key.
@@ -133,4 +133,14 @@ func (m MinersMap) IterBuffered() <-chan Tuple {
 		close(ch)
 	}()
 	return ch
+}
+
+func fnv32(key string) uint32 {
+	hash := uint32(2166136261)
+	const prime32 = uint32(16777619)
+	for i := 0; i < len(key); i++ {
+		hash *= prime32
+		hash ^= uint32(key[i])
+	}
+	return hash
 }
